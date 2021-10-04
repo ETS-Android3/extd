@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DesignSurface">
+    <option name="filePathToZoomLevelMap">
+      <map>
+        <entry key="app/src/main/res/drawable/east_black_24dp.xml" value="0.6651041666666667" />
+        <entry key="app/src/main/res/layout/activity_connection_error.xml" value="0.6552083333333333" />
+        <entry key="app/src/main/res/layout/activity_main.xml" value="0.5" />
+        <entry key="app/src/main/res/layout/activity_new_connection.xml" value="0.67" />
+        <entry key="app/src/main/res/layout/activity_saved_connections.xml" value="0.6520833333333333" />
+        <entry key="app/src/main/res/layout/fragment_available_connections.xml" value="0.6520833333333333" />
+        <entry key="app/src/main/res/layout/fragment_new_connection.xml" value="0.6489583333333333" />
+        <entry key="app/src/main/res/layout/fragment_saved_connections.xml" value="0.6489583333333333" />
+        <entry key="app/src/main/res/layout/server_list_item.xml" value="0.5869791666666667" />
+      </map>
+    </option>
+  </component>
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_11" default="true" project-jdk-name="1.8" project-jdk-type="JavaSDK" />
+</project>

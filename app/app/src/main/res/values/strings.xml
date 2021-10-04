@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">ExtD</string>
+    <string name="searching">Searching...</string>
+    <string name="new_connection">New Connection</string>
+    <string name="serverListTitle">Available Computers</string>
+    <string name="title_activity_canvas">FullscreenActivity</string>
+    <string name="dummy_button">Dummy Button</string>
+    <string name="dummy_content">DUMMY\nCONTENT</string>
+    <string name="ip_label">Ip:</string>
+    <string name="port_label">Port:</string>
+    <string name="secret_label">Secret:</string>
+    <string name="connection_error">Couldn\'t connect :(</string>
+    <string name="saved_connections">Saved connections</string>
+    <string name="available_connections">Available connections</string>
+    <string name="empty">Nothing\'s here :(</string>
+    <string name="no_saved_connections">No saved connections.\nSwipe right to add one.</string>
+    <string name="generating_keys">Generating Keys</string>
+    <string name="key_gen_failure">Key generation failed</string>
+</resources>
