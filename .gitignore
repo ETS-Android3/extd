@@ -1,0 +1,7 @@
+*.out
+*.o
+**/*.out
+**/*.o
+daemon
+listener
+ssh_handler
