@@ -7,7 +7,7 @@ import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.adapter.FragmentViewHolder
 import androidx.viewpager2.widget.ViewPager2
 
-private const val NUM_PAGES = 3
+private const val NUM_PAGES = 2
 
 class ScreenSlidePagerActivity : FragmentActivity() {
 
@@ -40,9 +40,6 @@ class ScreenSlidePagerActivity : FragmentActivity() {
         override fun createFragment(position: Int): Fragment {
             if (position == 1) {
                 return PageFragmentSavedConnections()
-            }
-            if (position == 2) {
-                return PageFragmentAvailableConnections()
             }
 
             return PageFragmentNewConnection()

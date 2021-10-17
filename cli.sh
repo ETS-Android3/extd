@@ -14,7 +14,6 @@ if [ "$1" == "add" ]; then
   __BASE_DIR__/bin/listener "$port" "$secret"
 
 elif [ "$1" == "daemon" ]; then
-
   if [ "$2" == "start" ]; then
     if [ ! -f __BASE_DIR__/daemon.pid ]; then
       __BASE_DIR__/bin/daemon

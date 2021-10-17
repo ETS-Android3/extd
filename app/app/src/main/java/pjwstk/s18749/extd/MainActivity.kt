@@ -1,10 +1,7 @@
 package pjwstk.s18749.extd
 
-import android.content.Intent
-import android.opengl.Visibility
+import android.content.Context
 import android.os.Bundle
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
 import android.util.Log
 import android.view.View
 import android.widget.Toast
@@ -13,23 +10,22 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
-import kotlinx.android.synthetic.main.activity_main.*
-import kotlinx.android.synthetic.main.activity_new_connection.*
-import java.lang.Exception
+import pjwstk.s18749.extd.databinding.ActivityMainBinding
+import java.io.File
+import java.io.IOException
+import java.security.KeyPair
 import java.security.KeyPairGenerator
-import java.security.KeyStore
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var viewPager: ViewPager2
+    private lateinit var binding: ActivityMainBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        viewPager = findViewById(R.id.vpPager)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
         val pagerAdapter = ScreenSlidePagerAdapter(this)
-        viewPager.adapter = pagerAdapter
+        binding.vpPager.adapter = pagerAdapter
 
         val intent = intent
         val data = intent.data.toString()
@@ -43,69 +39,93 @@ class MainActivity : AppCompatActivity() {
                 val ip = args[1]
                 val secret = args[0]
 
-                txIp.setText(ip)
-                txPort.setText(port.toString())
-                txSecret.setText(secret)
-
-                viewPager.currentItem = 1
+//                txIp.setText(ip)
+//                txPort.setText(port.toString())
+//                txSecret.setText(secret)
+//
+//                viewPager.currentItem = 1
             }
         }
 
-        val ks: KeyStore = KeyStore.getInstance("AndroidKeyStore").apply {
-            load(null)
-        }
+        val priv = File(applicationContext.filesDir,"id_rsa")
+        val pub = File(applicationContext.filesDir,"id_rsa.pub")
 
-        if (!ks.containsAlias("extd")) {
-            try {
-                Log.w("extd", "Not an instance of a PrivateKeyEntry")
-                vpPager.visibility = View.GONE
-                genKeys.visibility = View.VISIBLE
+        if (!priv.exists() || !pub.exists()) {
+            binding.genKeys.visibility = View.VISIBLE
+            val kp = getKeyPair()
 
-                val kpg: KeyPairGenerator = KeyPairGenerator.getInstance(
-                    KeyProperties.KEY_ALGORITHM_EC,
-                    "AndroidKeyStore"
-                )
-                val parameterSpec: KeyGenParameterSpec = KeyGenParameterSpec.Builder(
-                    "extd",
-                    KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
-                ).run {
-                    setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
-                    build()
+            if (kp != null) {
+                binding.vpPager.visibility = View.VISIBLE
+                binding.genKeys.visibility = View.GONE
+
+                try {
+                    val fosPriv = openFileOutput("id_rsa", Context.MODE_PRIVATE)
+                    val fosPub = openFileOutput("id_rsa.pub", Context.MODE_PRIVATE)
+
+                    fosPriv.write(kp.private.encoded)
+                    fosPub.write(kp.public.encoded)
+
+                    fosPriv.flush()
+                    fosPub.flush()
+
+                    fosPriv.close()
+                    fosPub.close()
+
+                    Toast.makeText(
+                        this,
+                        "ok: ${priv.exists()} ${pub.exists()}",
+                        Toast.LENGTH_LONG
+                    ).show()
+
+//                    Toast.makeText(
+//                        this,
+//                        "Key generation successful",
+//                        Toast.LENGTH_LONG
+//                    ).show()
+
+                } catch (e: IOException) {
+                    Toast.makeText(
+                        this,
+                        "Could not save keys",
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                    Log.d("extd", "Key saving failed: $e")
+                    binding.txKeyGenFailed.visibility = View.VISIBLE
                 }
-
-                kpg.initialize(parameterSpec)
-                kpg.generateKeyPair()
-
-                vpPager.visibility = View.VISIBLE
-                genKeys.visibility = View.GONE
-
-                Toast.makeText(
-                    this,
-                    "Key generation successful",
-                    Toast.LENGTH_LONG
-                ).show()
-
-            } catch (e: Exception) {
+            } else {
                 Toast.makeText(
                     this,
                     "Key generation failed",
                     Toast.LENGTH_LONG
                 ).show()
-                Log.d("extd", "KEy Generation Exception: $e")
-                txKeyGenFailed.visibility = View.VISIBLE
+
+                binding.txKeyGenFailed.visibility = View.VISIBLE
             }
+        }
+    }
+
+    fun getKeyPair(): KeyPair? {
+        return try {
+            val kpg = KeyPairGenerator.getInstance("RSA")
+            kpg.initialize(4096)
+            kpg.generateKeyPair()
+
+        } catch (e: Exception) {
+            Log.d("extd", "KEy Generation Exception: $e")
+            null
         }
     }
 
 
     override fun onBackPressed() {
-        if (viewPager.currentItem == 0) {
+        if (binding.vpPager.currentItem == 0) {
             // If the user is currently looking at the first step, allow the system to handle the
             // Back button. This calls finish() on this activity and pops the back stack.
             super.onBackPressed()
         } else {
             // Otherwise, select the previous step.
-            viewPager.currentItem = viewPager.currentItem - 1
+            binding.vpPager.currentItem = binding.vpPager.currentItem - 1
         }
     }
 
