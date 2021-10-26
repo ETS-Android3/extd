@@ -21,7 +21,6 @@ import com.jcraft.jsch.Session
 import pjwstk.s18749.extd.AppContextProvider.Companion.applicationContext
 import pub.devrel.easypermissions.AppSettingsDialog
 import pub.devrel.easypermissions.EasyPermissions
-import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.net.*
@@ -31,7 +30,6 @@ import java.security.spec.X509EncodedKeySpec
 import java.util.*
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeoutException
-
 
 class PageFragmentNewConnection : Fragment(), EasyPermissions.PermissionCallbacks,
     EasyPermissions.RationaleCallbacks {
@@ -158,11 +156,11 @@ class PageFragmentNewConnection : Fragment(), EasyPermissions.PermissionCallback
         val ks = getSshKeyPair()
 
         if (ks == null) {
-                Toast.makeText(
-                    activity,
-                    "No keys",
-                    Toast.LENGTH_LONG
-                ).show()
+            Toast.makeText(
+                activity,
+                "No keys",
+                Toast.LENGTH_LONG
+            ).show()
 
             return
         }
@@ -173,7 +171,14 @@ class PageFragmentNewConnection : Fragment(), EasyPermissions.PermissionCallback
                 val socket = DatagramSocket()
                 socket.soTimeout = 1000
 
-                val secretBytes = "$secret:${String(Base64.encode(ks.public.encoded, Base64.DEFAULT))}".toByteArray()
+                val secretBytes = "$secret:${
+                    String(
+                        Base64.encode(
+                            ks.public.encoded,
+                            Base64.DEFAULT
+                        )
+                    )
+                }".toByteArray()
                 val request = DatagramPacket(secretBytes, secretBytes.size, address, port)
                 socket.send(request)
 
@@ -285,7 +290,11 @@ class PageFragmentNewConnection : Fragment(), EasyPermissions.PermissionCallback
                 val argsData = result.contents.toString()
                 val args = argsData.replace("extd://", "").split(":")
 
-                Toast.makeText(activity, "Atrempting to connect to: ${args[1]}:${args[2]}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    activity,
+                    "Atrempting to connect to: ${args[1]}:${args[2]}",
+                    Toast.LENGTH_SHORT
+                ).show()
 
                 connect(args[1], Integer.parseInt(args[2].trim()), args[0])
             }
