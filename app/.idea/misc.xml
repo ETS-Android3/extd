@@ -5,14 +5,33 @@
       <map>
         <entry key="../../../../../../layout/custom_preview.xml" value="0.9651041666666667" />
         <entry key="app/src/main/res/drawable/east_black_24dp.xml" value="0.6651041666666667" />
+        <entry key="app/src/main/res/drawable/rounded_rectangle.xml" value="0.7067708333333333" />
+        <entry key="app/src/main/res/layout/about.xml" value="0.23425925925925925" />
+        <entry key="app/src/main/res/layout/activity_canvas.xml" value="0.5864583333333333" />
         <entry key="app/src/main/res/layout/activity_connection_error.xml" value="0.6552083333333333" />
         <entry key="app/src/main/res/layout/activity_main.xml" value="0.5" />
         <entry key="app/src/main/res/layout/activity_new_connection.xml" value="0.67" />
         <entry key="app/src/main/res/layout/activity_saved_connections.xml" value="0.6520833333333333" />
+        <entry key="app/src/main/res/layout/bookmarks_element.xml" value="0.8197463768115942" />
+        <entry key="app/src/main/res/layout/bookmarks_list_item.xml" value="0.8197463768115942" />
+        <entry key="app/src/main/res/layout/canvas.xml" value="0.8683168316831683" />
+        <entry key="app/src/main/res/layout/connection_list.xml" value="0.8197463768115942" />
+        <entry key="app/src/main/res/layout/connection_list_item.xml" value="0.8197463768115942" />
+        <entry key="app/src/main/res/layout/credentials_dialog.xml" value="0.8197463768115942" />
+        <entry key="app/src/main/res/layout/discovered_servers_element.xml" value="0.8197463768115942" />
+        <entry key="app/src/main/res/layout/discovered_servers_list_item.xml" value="0.8197463768115942" />
+        <entry key="app/src/main/res/layout/editbookmarks.xml" value="0.8197463768115942" />
         <entry key="app/src/main/res/layout/fragment_available_connections.xml" value="0.6520833333333333" />
         <entry key="app/src/main/res/layout/fragment_new_connection.xml" value="0.6489583333333333" />
         <entry key="app/src/main/res/layout/fragment_saved_connections.xml" value="0.6489583333333333" />
+        <entry key="app/src/main/res/layout/help.xml" value="0.8197463768115942" />
+        <entry key="app/src/main/res/layout/importexport.xml" value="0.8197463768115942" />
+        <entry key="app/src/main/res/layout/main.xml" value="0.8197463768115942" />
+        <entry key="app/src/main/res/layout/metakey.xml" value="0.8197463768115942" />
+        <entry key="app/src/main/res/layout/new_conn_element.xml" value="0.8197463768115942" />
         <entry key="app/src/main/res/layout/server_list_item.xml" value="0.5869791666666667" />
+        <entry key="app/src/main/res/layout/zoom_controls.xml" value="0.5864583333333333" />
+        <entry key="app/src/main/res/menu/vnccanvasactivitymenu.xml" value="0.690625" />
       </map>
     </option>
   </component>

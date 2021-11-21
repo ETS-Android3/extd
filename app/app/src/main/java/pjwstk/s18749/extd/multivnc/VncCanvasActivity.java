@@ -30,7 +30,6 @@ import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.ProgressDialog;
 import android.text.ClipboardManager;
-import android.content.ContentValues;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -55,6 +54,8 @@ import android.widget.Toast;
 import android.view.inputmethod.InputMethodManager;
 import android.content.Context;
 
+import pjwstk.s18749.extd.R;
+
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 @SuppressWarnings("deprecation")
@@ -64,8 +65,7 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
     private final static String TAG = "VncCanvasActivity";
 
 
-    VncCanvas vncCanvas;
-    VncDatabase database;
+    public VncCanvas vncCanvas;
     private ConnectionBean connection;
 
     ZoomControls zoomer;
@@ -95,7 +95,7 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
 
         // hide system ui after softkeyboard close as per https://stackoverflow.com/a/21278040/361413
         final View decorView = getWindow().getDecorView();
-        decorView.setOnSystemUiVisibilityChangeListener (new View.OnSystemUiVisibilityChangeListener() {
+        decorView.setOnSystemUiVisibilityChangeListener(new View.OnSystemUiVisibilityChangeListener() {
             @Override
             public void onSystemUiVisibilityChange(int visibility) {
                 hideSystemUI();
@@ -135,8 +135,6 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
 
         prefs = getSharedPreferences(Constants.PREFSNAME, MODE_PRIVATE);
 
-        database = VncDatabase.getInstance(this);
-
         mClipboardManager = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
 
 
@@ -171,34 +169,19 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
             // has made this parsing of host necessary, i.e. getPort() returns -1 and the stuff after the colon is
             // still in the host part...
             // http://code.google.com/p/android/issues/detail?id=9952
-            if(! connection.parseHostPort(data.getHost())) {
+            if (!connection.parseHostPort(data.getHost())) {
                 // no colons in getHost()
                 connection.port = data.getPort();
                 connection.address = data.getHost();
             }
 
-            if (connection.address.equals(Constants.CONNECTION)) // this is a bookmarked connection
-            {
-                Log.d(TAG, "Starting bookmarked connection " + connection.port);
-                // read in this bookmarked connection
-                ConnectionBean result = database.getConnectionDao().get(connection.port);
-                if (result == null) {
-                    Log.e(TAG, "Bookmarked connection " + connection.port + " does not exist!");
-                    Utils.showFatalErrorMessage(this, getString(R.string.bookmark_invalid));
-                    return;
-                }
-                connection = result;
+            connection.nickname = connection.address;
+            List<String> path = data.getPathSegments();
+            if (path.size() >= 1) {
+                connection.colorModel = path.get(0);
             }
-            else // well, not a boomarked connection
-            {
-                connection.nickname = connection.address;
-                List<String> path = data.getPathSegments();
-                if (path.size() >= 1) {
-                    connection.colorModel = path.get(0);
-                }
-                if (path.size() >= 2) {
-                    connection.password = path.get(1);
-                }
+            if (path.size() >= 2) {
+                connection.password = path.get(1);
             }
         }
         // Uri == null
@@ -233,9 +216,6 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
         });
 
 
-
-
-
         zoomer.hide();
         zoomer.setOnZoomInClickListener(new View.OnClickListener() {
 
@@ -249,8 +229,7 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
                 try {
                     showZoomer(true);
                     vncCanvas.scaling.zoomIn();
-                }
-                catch(NullPointerException e) {
+                } catch (NullPointerException e) {
                 }
             }
 
@@ -267,8 +246,7 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
                 try {
                     showZoomer(true);
                     vncCanvas.scaling.zoomOut();
-                }
-                catch(NullPointerException e) {
+                } catch (NullPointerException e) {
                 }
             }
 
@@ -295,45 +273,19 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
         mousebutton1.init(1, vncCanvas);
         mousebutton2.init(2, vncCanvas);
         mousebutton3.init(3, vncCanvas);
-        if(! prefs.getBoolean(Constants.PREFS_KEY_MOUSEBUTTONS, true))
+        if (!prefs.getBoolean(Constants.PREFS_KEY_MOUSEBUTTONS, true))
             mousebuttons.setVisibility(View.GONE);
 
         touchpoints = (TouchPointView) findViewById(R.id.touchpoints);
         touchpoints.setInputHandler(inputHandler);
 
         // create an empty toast. we do this do be able to cancel
-        notificationToast = Toast.makeText(this,  "", Toast.LENGTH_SHORT);
+        notificationToast = Toast.makeText(this, "", Toast.LENGTH_SHORT);
         notificationToast.setGravity(Gravity.TOP, 0, 60);
 
 
-        if(! prefs.getBoolean(Constants.PREFS_KEY_POINTERHIGHLIGHT, true))
+        if (!prefs.getBoolean(Constants.PREFS_KEY_POINTERHIGHLIGHT, true))
             vncCanvas.setPointerHighlight(false);
-
-
-        /*
-         * ask whether to show help on first run
-         */
-        if(Utils.appstarts == 1) {
-            new AlertDialog.Builder(this)
-                    .setMessage(R.string.firstrun_help_dialog_text)
-                    .setTitle(R.string.firstrun_help_dialog_title)
-                    .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int id) {
-                            Intent helpIntent = new Intent (VncCanvasActivity.this, HelpActivity.class);
-                            VncCanvasActivity.this.startActivity(helpIntent);
-                        }
-                    })
-                    .setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int id) {
-                            try {
-                                dialog.dismiss();
-                            }
-                            catch(Exception e) {
-                            }
-                        }
-                    })
-                    .show();
-        }
 
     }
 
@@ -348,31 +300,6 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
 
     ConnectionBean getConnection() {
         return connection;
-    }
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see android.app.Activity#onCreateDialog(int)
-     */
-    @Override
-    protected Dialog onCreateDialog(int id) {
-
-
-        // Default to meta key dialog
-        return new MetaKeyDialog(this);
-    }
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see android.app.Activity#onPrepareDialog(int, android.app.Dialog)
-     */
-    @Override
-    protected void onPrepareDialog(int id, Dialog dialog) {
-        super.onPrepareDialog(id, dialog);
-        if (dialog instanceof MetaKeyDialog)
-            ((MetaKeyDialog) dialog).setConnection(connection);
     }
 
 
@@ -396,7 +323,7 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
         vncCanvas.onPause();
 
         // get VNC cuttext and post to Android
-        if(vncCanvas.vncConn.getCutText() != null) {
+        if (vncCanvas.vncConn.getCutText() != null) {
             try {
                 mClipboardManager.setText(vncCanvas.vncConn.getCutText());
             } catch (Exception e) {
@@ -416,8 +343,7 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
         if (mClipboardManager.hasText()) {
             try {
                 vncCanvas.vncConn.sendCutText(mClipboardManager.getText().toString());
-            }
-            catch(NullPointerException e) {
+            } catch (NullPointerException e) {
                 //unused
             }
         }
@@ -457,24 +383,21 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
                 selectColorModel();
                 return true;
             case R.id.itemToggleFramebufferUpdate:
-                if(vncCanvas.vncConn.toggleFramebufferUpdates()) // view enabled
+                if (vncCanvas.vncConn.toggleFramebufferUpdates()) // view enabled
                 {
                     vncCanvas.setVisibility(View.VISIBLE);
                     touchpoints.setVisibility(View.GONE);
-                }
-                else
-                {
+                } else {
                     vncCanvas.setVisibility(View.GONE);
                     touchpoints.setVisibility(View.VISIBLE);
                 }
                 return true;
 
             case R.id.itemToggleMouseButtons:
-                if(mousebuttons.getVisibility()== View.VISIBLE) {
+                if (mousebuttons.getVisibility() == View.VISIBLE) {
                     mousebuttons.setVisibility(View.GONE);
                     ed.putBoolean(Constants.PREFS_KEY_MOUSEBUTTONS, false);
-                }
-                else {
+                } else {
                     mousebuttons.setVisibility(View.VISIBLE);
                     ed.putBoolean(Constants.PREFS_KEY_MOUSEBUTTONS, true);
                 }
@@ -482,7 +405,7 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
                 return true;
 
             case R.id.itemTogglePointerHighlight:
-                if(vncCanvas.getPointerHighlight())
+                if (vncCanvas.getPointerHighlight())
                     vncCanvas.setPointerHighlight(false);
                 else
                     vncCanvas.setPointerHighlight(true);
@@ -497,18 +420,6 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
 
             case R.id.itemSendKeyAgain:
                 sendSpecialKeyAgain();
-                return true;
-            case R.id.itemSaveBookmark:
-                database.getConnectionDao().save(connection);
-                Toast.makeText(this, getString(R.string.bookmark_saved), Toast.LENGTH_SHORT).show();
-                return true;
-            case R.id.itemAbout:
-                Intent intent = new Intent (this, AboutActivity.class);
-                this.startActivity(intent);
-                return true;
-            case R.id.itemHelp:
-                Intent helpIntent = new Intent (this, HelpActivity.class);
-                this.startActivity(helpIntent);
                 return true;
             case R.id.itemDisconnect:
                 new AlertDialog.Builder(this)
@@ -533,14 +444,14 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
     MetaKeyBean lastSentKey;
 
     private void sendSpecialKeyAgain() {
-        if (lastSentKey == null) {
-            lastSentKey = database.getMetaKeyDao().get(connection.lastMetaKeyId);
-        }
+//        if (lastSentKey == null) {
+//            lastSentKey = database.getMetaKeyDao().get(connection.lastMetaKeyId);
+//        }
         vncCanvas.sendMetaKey(lastSentKey);
     }
 
     private void toggleKeyboard() {
-        InputMethodManager inputMgr = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+        InputMethodManager inputMgr = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         vncCanvas.requestFocus();
         inputMgr.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
     }
@@ -553,8 +464,7 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
                 inputHandler.shutdown();
                 vncCanvas.vncConn.shutdown();
                 vncCanvas.onDestroy();
-            }
-            catch(NullPointerException e) {
+            } catch (NullPointerException e) {
             }
         }
     }
@@ -562,7 +472,7 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent evt) {
-        if(Utils.DEBUG()) Log.d(TAG, "Input: key down: " + evt.toString());
+        if (Utils.DEBUG()) Log.d(TAG, "Input: key down: " + evt.toString());
 
         if (keyCode == KeyEvent.KEYCODE_MENU) {
             prepareFabMenu(fabMenu);
@@ -570,13 +480,13 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
             return true;
         }
 
-        if(keyCode == KeyEvent.KEYCODE_BACK) {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
 
             // handle right mouse button of USB-OTG devices
             // Also, https://fossies.org/linux/SDL2/android-project/app/src/main/java/org/libsdl/app/SDLActivity.java line 1943 states:
             // 12290 = Samsung DeX mode desktop mouse
             // 12290 = 0x3002 = 0x2002 | 0x1002 = SOURCE_MOUSE | SOURCE_TOUCHSCREEN
-            if(evt.getSource() == InputDevice.SOURCE_MOUSE || evt.getSource() == (InputDevice.SOURCE_MOUSE | InputDevice.SOURCE_TOUCHSCREEN)) {
+            if (evt.getSource() == InputDevice.SOURCE_MOUSE || evt.getSource() == (InputDevice.SOURCE_MOUSE | InputDevice.SOURCE_TOUCHSCREEN)) {
                 MotionEvent e = MotionEvent.obtain(
                         SystemClock.uptimeMillis(),
                         SystemClock.uptimeMillis(),
@@ -589,7 +499,7 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
                 return true;
             }
 
-            if(evt.getFlags() == KeyEvent.FLAG_FROM_SYSTEM) // from hardware keyboard
+            if (evt.getFlags() == KeyEvent.FLAG_FROM_SYSTEM) // from hardware keyboard
                 keyCode = KeyEvent.KEYCODE_ESCAPE;
             else {
                 new AlertDialog.Builder(this)
@@ -619,9 +529,9 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent evt) {
-        if(Utils.DEBUG()) Log.d(TAG, "Input: key up: " + evt.toString());
+        if (Utils.DEBUG()) Log.d(TAG, "Input: key up: " + evt.toString());
 
-        if(keyCode == KeyEvent.KEYCODE_BACK) {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
             // handle right mouse button of USB-OTG devices
             if (evt.getSource() == InputDevice.SOURCE_MOUSE) {
                 MotionEvent e = MotionEvent.obtain(
@@ -652,20 +562,17 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
     // times the given key code should be executed.
     // Otherwise, if the key code is KEYCODE_UNKNOWN, then this is a sequence of characters as returned by getCharacters().
     @Override
-    public boolean onKeyMultiple (int keyCode, int count, KeyEvent evt) {
-        if(Utils.DEBUG()) Log.d(TAG, "Input: key mult: " + evt.toString());
+    public boolean onKeyMultiple(int keyCode, int count, KeyEvent evt) {
+        if (Utils.DEBUG()) Log.d(TAG, "Input: key mult: " + evt.toString());
 
         // we only deal with the special char case for now
-        if(evt.getKeyCode() == KeyEvent.KEYCODE_UNKNOWN) {
+        if (evt.getKeyCode() == KeyEvent.KEYCODE_UNKNOWN) {
             if (vncCanvas.processLocalKeyEvent(keyCode, evt))
                 return true;
         }
 
         return super.onKeyMultiple(keyCode, count, evt);
     }
-
-
-
 
 
     private void selectColorModel() {
@@ -678,17 +585,16 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
         for (int i = 0; i < choices.length; i++) {
             COLORMODEL cm = COLORMODEL.values()[i];
             choices[i] = cm.toString();
-            if(cm.equals(vncCanvas.vncConn.getColorModel()))
+            if (cm.equals(vncCanvas.vncConn.getColorModel()))
                 currentSelection = i;
         }
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setSingleChoiceItems(choices, currentSelection, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int item) {
-                try{
+                try {
                     dialog.dismiss();
-                }
-                catch(Exception e) {
+                } catch (Exception e) {
                 }
                 COLORMODEL cm = COLORMODEL.values()[item];
                 vncCanvas.vncConn.setColorModel(cm);
@@ -724,9 +630,9 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
     }
 
     Runnable hideZoomLevelInstance = () -> zoomLevel.setVisibility(View.INVISIBLE);
-    public void showZoomLevel()
-    {
-        zoomLevel.setText("" + (int)(vncCanvas.getScale()*100) +"%");
+
+    public void showZoomLevel() {
+        zoomLevel.setText("" + (int) (vncCanvas.getScale() * 100) + "%");
         zoomLevel.setVisibility(View.VISIBLE);
         vncCanvas.handler.removeCallbacks(hideZoomLevelInstance);
         vncCanvas.handler.postDelayed(hideZoomLevelInstance, ZOOM_HIDE_DELAY_MS);

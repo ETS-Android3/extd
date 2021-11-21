@@ -1,6 +1,7 @@
 #ifndef UTILS_C
 #define UTILS_C
 
+#include <assert.h>
 #include <errno.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -16,15 +17,19 @@
 
 #include "config.h"
 
+#define MAX_LINE_SIZE 200
+
 struct msg_buff {
   long mtype;
-  char *mtext;
+  char mtext[MAX_LINE_SIZE];
 };
 
 void log_info(char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
   syslog(LOG_INFO, fmt, args);
+  printf(fmt, args);
+  fflush(stdout);
   va_end(args);
 }
 
@@ -32,6 +37,8 @@ void log_error(char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
   syslog(LOG_ERR, fmt, args);
+  printf(fmt, args);
+  fflush(stdout);
   va_end(args);
 }
 
@@ -39,8 +46,11 @@ int die(char *s) {
   // log_error(s, strerror(errno));
   log_error("%s", s);
   syslog(LOG_ERR, "%s: %s", s, strerror(errno));
+  printf("%s: %s", s, strerror(errno));
+  fflush(stdout);
   perror(s);
   exit(EXIT_FAILURE);
+  closelog();
   return EXIT_FAILURE;
 }
 
@@ -109,13 +119,13 @@ int get_queue() {
   return msqid;
 }
 
-int send(int msqid, struct msg_buff *buf) {
+int send_m(int msqid, struct msg_buff *buf) {
   buf->mtype = 1; /* we don't really care in this case */
   int len = strlen(buf->mtext);
   return msgsnd(msqid, buf, len + 1, 0);
 }
 
-int receive(int msqid, struct msg_buff *buf) {
+int receive_m(int msqid, struct msg_buff *buf) {
   return msgrcv(msqid, buf, sizeof buf->mtext, 0, 0);
 }
 

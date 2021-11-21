@@ -7,56 +7,34 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "util.c"
 
 #define BUFLEN 512  // Max length of buffer
 
-int die(char *s) {
-  perror(s);
-  exit(1);
-  return 1;
-}
+int in_file(char *needle, char *file) {
+  size_t len = 0;
+  ssize_t read;
+  char *line = NULL;
+  FILE *fp;
+  int infile = 0;
 
-char **str_split(char *a_str, const char a_delim) {
-  char **result = 0;
-  size_t count = 0;
-  char *tmp = a_str;
-  char *last_comma = 0;
-  char delim[2];
-  delim[0] = a_delim;
-  delim[1] = 0;
-
-  /* Count how many elements will be extracted. */
-  while (*tmp) {
-    if (a_delim == *tmp) {
-      count++;
-      last_comma = tmp;
-    }
-    tmp++;
+  if ((fp = fopen(file, "r")) == NULL) {
+    die("pid_file");
   }
 
-  /* Add space for trailing token. */
-  count += last_comma < (a_str + strlen(a_str) - 1);
+  while ((read = getline(&line, &len, fp)) != -1) {
+    line[strcspn(line, "\n")] = 0;
 
-  /* Add space for terminating null string so caller
-     knows where the list of returned strings ends. */
-  count++;
-
-  result = malloc(sizeof(char *) * count);
-
-  if (result) {
-    size_t idx = 0;
-    char *token = strtok(a_str, delim);
-
-    while (token) {
-      assert(idx < count);
-      *(result + idx++) = strdup(token);
-      token = strtok(0, delim);
+    if (!strcmp(line, needle)) {
+      infile = 1;
+      break;
     }
-    assert(idx == count - 1);
-    *(result + idx) = 0;
   }
 
-  return result;
+  if (line) free(line);
+  fclose(fp);
+
+  return infile;
 }
 
 int main(int argc, char const *argv[]) {
@@ -94,6 +72,7 @@ int main(int argc, char const *argv[]) {
     memset(buf, 0, strlen(buf));
     fflush(stdout);
 
+    printf("waiting for connections...\n");
     if ((recv_len = recvfrom(s, buf, BUFLEN, 0, (struct sockaddr *)&si_other,
                              &slen)) == -1) {
       die("recvfrom()");
@@ -105,28 +84,46 @@ int main(int argc, char const *argv[]) {
     printf("Data: %s\n", buf);
 
     char *from = inet_ntoa(si_other.sin_addr);
-    char **split = str_split(buf, ':');
-    int size = (sizeof split / sizeof *split) + 1;
+    int size = 0;
+    char split[20][20];
+
+    char *context = NULL;
+    char *token = strtok_r(buf, ":", &context);
+
+    while (token != NULL) {
+      strcpy(split[size], token);  // Copy to token list
+      size++;
+      token = strtok_r(NULL, ":", &context);
+    }
 
     if (size == 2 && strcmp(split[0], secret) == 0) {
-      printf("Data OK");
-
-      FILE *fp;
-      char *file = AUTHORIZED_KEYS_FILE;
-
-      if ((fp = fopen(file, "a")) == NULL) {
-        die("pid_file");
-      }
+      printf("Data OK\n");
 
       int len = strlen(split[1]);
       if (split[1][len - 1] == '\n') split[1][len - 1] = '\0';
 
-      if (fprintf(fp, "ssh-rsa %s extd@%s", split[1], from) < 0) {
-        die("fprintf");
+      char needle[255];
+      sprintf(needle, "%s extd@%s", split[1], from);
+      int infile = in_file(needle, AUTHORIZED_KEYS_FILE);
+
+      if (infile == 0) {
+        FILE *fp;
+        char *file = AUTHORIZED_KEYS_FILE;
+
+        if ((fp = fopen(file, "a")) == NULL) {
+          die("pid_file");
+        }
+
+        if (fprintf(fp, "%s extd@%s\n", split[1], from) < 0) {
+          die("fprintf");
+        }
+
+        fclose(fp);
+      } else {
+        printf("client was already in authorized_keys.\n");
       }
 
-      fclose(fp);
-
+      printf("accepted.\n");
       if (sendto(s, buf, recv_len, 0, (struct sockaddr *)&si_other, slen) ==
           -1) {
         die("sendto()");

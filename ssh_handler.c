@@ -10,19 +10,51 @@
 #include "util.c"
 
 int main(void) {
-  struct msg_buff buf;
   char msg[200];
-  buf.mtext = msg;
-  int msqid = get_queue();
 
-  buf.mtype = 1; /* we don't really care in this case */
-
-  while (fgets(buf.mtext, sizeof buf.mtext, stdin) != NULL) {
-    int len = strlen(buf.mtext);
+  while (fgets(msg, sizeof msg, stdin) != NULL) {
+    int len = strlen(msg);
 
     /* ditch newline at end, if it exists */
-    if (buf.mtext[len - 1] == '\n') buf.mtext[len - 1] = '\0';
+    // if (msg[len - 1] == '\n') msg[len - 1] = '\0';
 
-    if (send(msqid, &buf) == -1) die("msgsnd");
+    int size = 0;
+    char split[20][20];
+
+    char *context = NULL;
+    char *token = strtok_r(msg, ":", &context);
+
+    while (token != NULL) {
+      strcpy(split[size], token);  // Copy to token list
+      size++;
+      token = strtok_r(NULL, ":", &context);
+    }
+
+    printf("%d", size);
+
+    if (size == 4) {
+      if (strcmp(split[0], "con") == 0) {
+        log_info("dimensions: %sx%s\n", split[1], split[2]);
+        // int pid = fork();
+
+        // if (0 == pid) {
+        //   char logfile[50];
+        //   sprintf(logfile, "/usr/share/extd/%s.log", split[1]);
+
+        //   char *const args[10] = {
+        //       "/usr/bin/x11vnc", "-once", "-timeout", "30",
+        //       "-localhost",     "-o",    logfile,    "-threads",
+        //       "-passwd",         split[3]};
+
+        //   execvp("/usr/bin/x11vnc", args);
+        // }
+      } else {
+        log_error("invalid command: %s.", split[0]);
+      }
+    } else {
+      log_error("invalid parameters received: %s", msg);
+    }
+
+    // printf("extd:success\n");
   }
 }

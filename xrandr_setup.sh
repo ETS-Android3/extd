@@ -1,16 +1,16 @@
-#!/bin/sh
+#!/bin/bash
 
 output="$1"
 mode="$2"
 direction="$3"
 reference="$4"
 
-help () {
-  printf "usage:\nsetup output|auto [w]x[h]_[r]+[x]+[y] [direction][--of] [output|primary]\n"
+help() {
+  printf "usage:\nsetup output|auto [w]x[h]_[r]+[x]+[y] [direction][-of] [output|primary]\n"
   printf "\tdirection: one of [right-of, left-of, above, below]\n"
 }
 
-get_available_output () {
+get_available_output() {
   virtual="$(xrandr -q | grep disconnected | grep VIRTUAL | head -n1 | cut -f1 -d ' ')"
   unused="$virtual"
   [ -z "$unused" ] && unused="$(xrandr -q | grep disconnected | head -n1 | cut -f1 -d ' ')"

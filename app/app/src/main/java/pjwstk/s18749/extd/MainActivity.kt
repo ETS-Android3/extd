@@ -1,7 +1,7 @@
 package pjwstk.s18749.extd
 
-import android.content.Context
 import android.os.Bundle
+import android.util.Base64
 import android.util.Log
 import android.view.View
 import android.widget.Toast
@@ -9,12 +9,19 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.viewpager2.adapter.FragmentStateAdapter
-import androidx.viewpager2.widget.ViewPager2
 import pjwstk.s18749.extd.databinding.ActivityMainBinding
+import java.security.KeyPairGenerator
 import java.io.File
 import java.io.IOException
-import java.security.KeyPair
-import java.security.KeyPairGenerator
+import java.security.PrivateKey
+import java.security.PublicKey
+import com.jcraft.jsch.JSchException
+
+import pjwstk.s18749.extd.Constants.keyLength
+
+import com.jcraft.jsch.JSch
+import com.jcraft.jsch.KeyPair
+
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -55,15 +62,23 @@ class MainActivity : AppCompatActivity() {
             val kp = getKeyPair()
 
             if (kp != null) {
-                binding.vpPager.visibility = View.VISIBLE
-                binding.genKeys.visibility = View.GONE
-
+//                val priv: PrivateKey = kp.private
+//                val pub: PublicKey = kp.public
+//
+//                val sshPrivKey = KeyUtils.exportPEM(priv, "")
+//                val sshPubKey = KeyUtils.getPubkeyString(pub, "extd")
+//                binding.vpPager.visibility = View.VISIBLE
+//                binding.genKeys.visibility = View.GONE
+//
                 try {
-                    val fosPriv = openFileOutput("id_rsa", Context.MODE_PRIVATE)
-                    val fosPub = openFileOutput("id_rsa.pub", Context.MODE_PRIVATE)
+                    val fosPriv = openFileOutput("id_rsa", MODE_PRIVATE)
+                    val fosPub = openFileOutput("id_rsa.pub", MODE_PRIVATE)
 
-                    fosPriv.write(kp.private.encoded)
-                    fosPub.write(kp.public.encoded)
+//                    fosPriv.write(sshPrivKey.toByteArray())
+//                    fosPub.write(sshPubKey.toByteArray())
+
+                    kp.writePrivateKey(fosPriv)
+                    kp.writePublicKey(fosPub, "")
 
                     fosPriv.flush()
                     fosPub.flush()
@@ -73,7 +88,7 @@ class MainActivity : AppCompatActivity() {
 
                     Toast.makeText(
                         this,
-                        "ok: ${priv.exists()} ${pub.exists()}",
+                        "ok",
                         Toast.LENGTH_LONG
                     ).show()
 
@@ -107,14 +122,21 @@ class MainActivity : AppCompatActivity() {
 
     fun getKeyPair(): KeyPair? {
         return try {
-            val kpg = KeyPairGenerator.getInstance("RSA")
-            kpg.initialize(4096)
-            kpg.generateKeyPair()
-
-        } catch (e: Exception) {
+            val kp = KeyPair.genKeyPair(JSch(), KeyPair.RSA, 2048)
+            kp
+        } catch (e: JSchException) {
             Log.d("extd", "KEy Generation Exception: $e")
             null
         }
+//        return try {
+//            val kpg = KeyPairGenerator.getInstance("RSA")
+//            kpg.initialize(4096)
+//            kpg.generateKeyPair()
+//
+//        } catch (e: Exception) {
+//            Log.d("extd", "KEy Generation Exception: $e")
+//            null
+//        }
     }
 
 

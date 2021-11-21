@@ -11,16 +11,19 @@ if [ "$1" == "add" ]; then
 
   echo "extd://$secret:$ip:$port" | qrencode -t UTF8
   printf "connect manually: \nip: $ip\nport: $port\nsecret: $secret\n"
-  __BASE_DIR__/bin/listener "$port" "$secret"
+  __BASE_DIR__/bin/extd_listener "$port" "$secret"
 
 elif [ "$1" == "daemon" ]; then
   if [ "$2" == "start" ]; then
     if [ ! -f __BASE_DIR__/daemon.pid ]; then
-      __BASE_DIR__/bin/daemon
+      __BASE_DIR__/bin/extd_daemon
     fi
 
   elif [ "$2" == "stop" ]; then
     [ -f __BASE_DIR__/daemon.pid ] && kill -SIGINT "$(cat __BASE_DIR__/daemon.pid)"
+
+  elif [ "$2" == "status" ]; then
+    [ -f __BASE_DIR__/daemon.pid ] && journalctl -f _COMM=extd_daemon || echo "dead"
   fi
 
 elif [ "$1" == "revoke_access" ]; then

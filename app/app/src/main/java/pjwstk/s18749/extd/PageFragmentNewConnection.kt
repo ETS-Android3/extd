@@ -2,8 +2,8 @@ package pjwstk.s18749.extd
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Resources
 import android.os.Bundle
-import android.util.Base64
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -17,19 +17,22 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.zxing.integration.android.IntentIntegrator
 import com.jcraft.jsch.JSch
 import com.jcraft.jsch.JSchException
+import com.jcraft.jsch.KeyPair
 import com.jcraft.jsch.Session
 import pjwstk.s18749.extd.AppContextProvider.Companion.applicationContext
+import pjwstk.s18749.extd.multivnc.COLORMODEL
+import pjwstk.s18749.extd.multivnc.ConnectionBean
+import pjwstk.s18749.extd.multivnc.Constants
+import pjwstk.s18749.extd.multivnc.VncCanvasActivity
 import pub.devrel.easypermissions.AppSettingsDialog
 import pub.devrel.easypermissions.EasyPermissions
-import java.io.FileNotFoundException
-import java.io.IOException
 import java.net.*
-import java.security.KeyFactory
-import java.security.KeyPair
-import java.security.spec.X509EncodedKeySpec
 import java.util.*
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeoutException
+import android.util.DisplayMetrics
+import java.io.*
+
 
 class PageFragmentNewConnection : Fragment(), EasyPermissions.PermissionCallbacks,
     EasyPermissions.RationaleCallbacks {
@@ -38,8 +41,32 @@ class PageFragmentNewConnection : Fragment(), EasyPermissions.PermissionCallback
     private lateinit var txSecret: EditText
     private lateinit var btConnect: Button
     private lateinit var fabQrConnect: FloatingActionButton
+    private lateinit var session: Session
 
     private val executor = Executors.newSingleThreadExecutor()
+
+    fun disconnect() {
+        try {
+            if (session.isConnected) {
+                session.disconnect()
+            }
+        } catch (e: Exception) {
+            Log.d("extd", "could not disconnect $e")
+
+            activity?.runOnUiThread {
+                Toast.makeText(
+                    activity,
+                    "could not disconnect",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        disconnect()
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -113,54 +140,103 @@ class PageFragmentNewConnection : Fragment(), EasyPermissions.PermissionCallback
         return false
     }
 
-    private fun getKeyPairFromString(pub: String, priv: String): KeyPair? {
+//    private fun getKeyPairFromString(pub: String, priv: String): KeyPair? {
+//        try {
+//            val byteKey = Base64.decode(pub.toByteArray(), Base64.DEFAULT)
+//            val pubKey = X509EncodedKeySpec(byteKey)
+//            val kf: KeyFactory = KeyFactory.getInstance("RSA")
+//
+//            val bytePrivKey = Base64.decode(priv.toByteArray(), Base64.DEFAULT)
+//            val privKey = X509EncodedKeySpec(bytePrivKey)
+//
+//            return KeyPair(kf.generatePublic(pubKey), kf.generatePrivate(privKey))
+//        } catch (e: Exception) {
+//            Log.d("extd", "Could convert keys: $e")
+//        }
+//
+//        return null
+//    }
+//
+//    private fun getSshKeyPair(): KeyPair? {
+//        var ks: KeyPair? = null
+//
+//        try {
+//            val priv = requireActivity().openFileInput("${applicationContext.filesDir}/id_rsa")
+//            val pub = requireActivity().openFileInput("${applicationContext.filesDir}/id_rsa.pub")
+//
+//            ks = getKeyPairFromString(
+//                pub.bufferedReader().use { it.readText() },
+//                priv.bufferedReader().use { it.readText() }
+//            )
+//
+//            pub.close()
+//            priv.close()
+//
+//        } catch (e: FileNotFoundException) {
+//            Log.d("extd", "No keys: $e")
+//        }
+//
+//        return ks
+//    }
+
+    private fun makeNewConn(ip: String, port: Int, username: String): ConnectionBean? {
+        val trimmedIp = ip.trim { it <= ' ' }
+        if (trimmedIp.length === 0) return null
+
+        val conn = ConnectionBean()
+        conn.address = trimmedIp
+        conn.id = 0 // is new!!
+
         try {
-            val byteKey = Base64.decode(pub.toByteArray(), Base64.DEFAULT)
-            val pubKey = X509EncodedKeySpec(byteKey)
-            val kf: KeyFactory = KeyFactory.getInstance("RSA")
-
-            val bytePrivKey = Base64.decode(priv.toByteArray(), Base64.DEFAULT)
-            val privKey = X509EncodedKeySpec(bytePrivKey)
-
-            return KeyPair(kf.generatePublic(pubKey), kf.generatePrivate(privKey))
-        } catch (e: Exception) {
-            Log.d("extd", "Could convert keys: $e")
+            conn.port = port
+        } catch (nfe: NumberFormatException) {
+            return null
         }
 
-        return null
+        conn.userName = username.trim { it <= ' ' }
+        conn.useLocalCursor = true // always enable
+        conn.colorModel = COLORMODEL.C24bit.nameString()
+        conn.useRepeater = false
+
+        return conn
     }
 
-    private fun getSshKeyPair(): KeyPair? {
-        var ks: KeyPair? = null
+    fun getPublicKey(keyPair: KeyPair): String? {
+        val baos = ByteArrayOutputStream()
+        keyPair.writePublicKey(baos, "")
+        return baos.toString()
+    }
 
-        try {
-            val priv = requireActivity().openFileInput("${applicationContext.filesDir}/id_rsa")
-            val pub = requireActivity().openFileInput("${applicationContext.filesDir}/id_rsa.pub")
-
-            ks = getKeyPairFromString(
-                pub.bufferedReader().use { it.readText() },
-                priv.bufferedReader().use { it.readText() }
-            )
-
-            pub.close()
-            priv.close()
-
-        } catch (e: FileNotFoundException) {
-            Log.d("extd", "No keys: $e")
-        }
-
-        return ks
+    fun getPrivateKey(keyPair: KeyPair): String? {
+        val baos = ByteArrayOutputStream()
+        keyPair.writePrivateKey(baos)
+        return baos.toString()
     }
 
     private fun connect(ip: String, port: Int, secret: String) {
-        val ks = getSshKeyPair()
+        Toast.makeText(
+            activity,
+            "Connecting...",
+            Toast.LENGTH_LONG
+        ).show()
+        val jsch = JSch()
+        var kpair: KeyPair
 
-        if (ks == null) {
-            Toast.makeText(
-                activity,
-                "No keys",
-                Toast.LENGTH_LONG
-            ).show()
+        try {
+            val priv = File(applicationContext.filesDir, "id_rsa")
+            val pub = File(applicationContext.filesDir, "id_rsa.pub")
+            kpair = KeyPair.load(jsch, priv.absolutePath, pub.absolutePath)
+            jsch.addIdentity(priv.absolutePath)
+
+        } catch (e: Exception) {
+            Log.d("extd", "err $e")
+            activity?.runOnUiThread {
+                Toast.makeText(
+                    activity,
+                    "err $e",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
 
             return
         }
@@ -170,61 +246,96 @@ class PageFragmentNewConnection : Fragment(), EasyPermissions.PermissionCallback
                 val address: InetAddress = InetAddress.getByName(ip)
                 val socket = DatagramSocket()
                 socket.soTimeout = 1000
-
-                val secretBytes = "$secret:${
-                    String(
-                        Base64.encode(
-                            ks.public.encoded,
-                            Base64.DEFAULT
-                        )
-                    )
-                }".toByteArray()
+                val secretBytes = "$secret:${getPublicKey(kpair)?.trim()}".toByteArray()
                 val request = DatagramPacket(secretBytes, secretBytes.size, address, port)
-                socket.send(request)
-
                 val buffer = ByteArray(512)
                 val response = DatagramPacket(buffer, buffer.size)
-                socket.receive(response)
 
-                activity?.runOnUiThread {
-                    Toast.makeText(
-                        activity,
-                        "Connection ok",
-                        Toast.LENGTH_LONG
-                    ).show()
+                try {
+                    socket.send(request)
+                    socket.receive(response)
+
+                } catch (e: Exception) {
+                    activity?.runOnUiThread {
+                        Toast.makeText(
+                            activity,
+                            "Couldn't connect to the host. Are you sure you're on the same network? ${e.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+
+                    Log.d("extd", "err: $e")
                 }
 
                 socket.close()
 
+                activity?.runOnUiThread {
+                    Toast.makeText(
+                        activity,
+                        "Connection ok: ${response.data}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+
                 try {
-                    val jsch = JSch()
+                    disconnect()
+                    session = jsch.getSession("extd", ip, 22)
+//                    session.setConfig("PreferredAuthentications", "publickey");
+                    session.setConfig("StrictHostKeyChecking", "no");
+                    session.timeout = 30000
+                    session.connect()
+                    val port = session.setPortForwardingL(5900, "127.0.0.1", 5900)
 
-                    Log.d("extd", "key: ${ks.private.encoded}")
-                    if (ks.private.encoded != null && ks.public.encoded != null) {
-                        jsch.addIdentity("extd", ks.private.encoded, ks.public.encoded, null)
+                    val channel = session.openChannel("shell")
+                    val displayMetrics = Resources.getSystem().displayMetrics
+                    val height = displayMetrics.heightPixels
+                    val width = displayMetrics.widthPixels
+                    var line = ""
 
-                        val session: Session = jsch.getSession("extd", ip, port)
-                        session.setConfig("PreferredAuthentications", "publickey");
-                        session.setConfig("StrictHostKeyChecking", "no");
-                        session.connect()
-                        val port = session.setPortForwardingL(0, ip, 4000)
+                    channel.connect()
+                    with(channel.inputStream) {
+                        with(channel.outputStream) {
+                            write("con:$width:$height:$secret\n".toByteArray())
+                        }
 
-                        Log.d("extd", "listening on $port")
+                        var c: Char
+                        do {
+                            c = read().toChar()
+                            if (c == '\n') break
+                            line += c.toString() + ""
+                        } while (c.code != -1)
+                    }
+
+                    channel.disconnect()
+
+                    if (line.contains("extd:success")) {
                         activity?.runOnUiThread {
                             Toast.makeText(
                                 activity,
-                                "connected",
+                                "connection failed $line",
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
-                    } else {
-                        Log.d("extd", "missing key")
-                        activity?.runOnUiThread {
-                            Toast.makeText(
-                                activity,
-                                "missing key",
-                                Toast.LENGTH_SHORT
-                            ).show()
+
+                        return@execute
+                    }
+
+                    Log.d("extd", "listening on $port")
+                    activity?.runOnUiThread {
+                        Toast.makeText(
+                            activity,
+                            "connected on port $port",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+
+                    activity?.runOnUiThread {
+                        val connection = makeNewConn("127.0.0.1", port, "extd")
+
+                        if (connection != null) {
+                            val intent = Intent(activity, VncCanvasActivity::class.java)
+                            intent.putExtra(Constants.CONNECTION, connection)
+                            startActivity(intent)
                         }
                     }
                 } catch (e: JSchException) {
@@ -232,10 +343,12 @@ class PageFragmentNewConnection : Fragment(), EasyPermissions.PermissionCallback
                     activity?.runOnUiThread {
                         Toast.makeText(
                             activity,
-                            "Authorization error",
+                            "Authorization error $e",
                             Toast.LENGTH_LONG
                         ).show()
                     }
+
+                    throw e
                 }
 
                 return@execute
