@@ -191,6 +191,10 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
 
             if (extras != null) {
                 connection = extras.getParcelable(Constants.CONNECTION);
+
+                if (connection == null) {
+                    throw new RuntimeException("no connection info specified");
+                }
             }
             if (connection.port == 0)
                 connection.port = 5900;
