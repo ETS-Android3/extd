@@ -74,7 +74,7 @@ def wait_for_accept_client(secret: str):
             print(f'got request from {address[0]}:{address[1]}')
 
             if request[0] == "extd" and request[1] == "spawn" and address[0] == "127.0.0.1" and received_secret == secret:
-                print(f'spawning server ({width}x{height})')
+                print(f'spawning server ({width}x{height}), {password}')
 
                 # server needs to be started as the same user that owns the desktop
                 # otherwise Xorg will not allow to open display :0

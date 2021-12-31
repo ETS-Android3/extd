@@ -128,7 +128,7 @@ class Connection() : Closeable {
         }
     }
 
-    private fun requestServer(secret: String) {
+    private fun requestServer(secret: String, pass: String) {
         if (!this::session.isInitialized || !session.isConnected) {
             throw RuntimeException("request server: session not open")
         }
@@ -144,7 +144,7 @@ class Connection() : Closeable {
 
                 with(BufferedReader(InputStreamReader(inputStream))) {
                     with(outputStream) {
-                        write("extd:conn:$width:$height:pass_i_want:$secret\n".toByteArray())
+                        write("extd:conn:$width:$height:$pass:$secret\n".toByteArray())
                         flush()
                     }
 
@@ -169,7 +169,7 @@ class Connection() : Closeable {
     fun connect(ip: String, port: Int, secret: String, pass: String): ConnectionBean {
         preConnect(ip, port, secret)
         prepareSession(ip)
-        requestServer(secret)
+        requestServer(secret, pass)
 
         val localHost = "127.0.0.1"
         val localPort = session.setPortForwardingL(0, localHost, 5900)

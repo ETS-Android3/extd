@@ -18,6 +18,7 @@ import com.google.zxing.integration.android.IntentIntegrator
 import kotlinx.coroutines.*
 import pjwstk.s18749.extd.databinding.ActivityMainBinding
 import pjwstk.s18749.extd.multivnc.ConnectionBean
+import pjwstk.s18749.extd.multivnc.Constants
 import pjwstk.s18749.extd.multivnc.VncCanvasActivity
 import pub.devrel.easypermissions.AppSettingsDialog
 import pub.devrel.easypermissions.EasyPermissions
@@ -124,6 +125,12 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks,
     fun connect(ip: String, port: Int, secret: String) {
         Toast.makeText(this, "Attempting to connect to $ip:$port ($secret)", Toast.LENGTH_SHORT)
             .show()
+//        val executor: ExecutorService = Executors.newFixedThreadPool(10)
+//
+//        executor.execute{
+//            val bean = connection.connect(ip, port, secret, randomPass(12))
+//            onBeanReady(bean)
+//        }
 
         scope.launch {
             try {
@@ -147,7 +154,7 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks,
 
         intent.putExtra(Constants.CONNECTION, bean)
 
-        Log.w("extd", "bean: $bean")
+        Log.d("extd", "bean: $bean")
         activityLauncher.launch(intent)
     }
 
