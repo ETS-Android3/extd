@@ -38,11 +38,13 @@ class ScreenSlidePagerActivity : FragmentActivity() {
         override fun getItemCount(): Int = NUM_PAGES
 
         override fun createFragment(position: Int): Fragment {
-            if (position == 1) {
-                return PageFragmentSavedConnections()
+            if (position == 0) {
+                return PageFragmentQuickConnect()
+            } else if (position == 1) {
+                return PageFragmentNewConnection()
             }
 
-            return PageFragmentNewConnection()
+            return PageFragmentConnectionHistory()
         }
     }
 }

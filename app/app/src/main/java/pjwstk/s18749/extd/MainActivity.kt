@@ -3,6 +3,7 @@ package pjwstk.s18749.extd
 import android.app.Activity
 import android.content.DialogInterface
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -13,6 +14,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.google.zxing.integration.android.IntentIntegrator
 import kotlinx.coroutines.*
@@ -20,16 +22,19 @@ import pjwstk.s18749.extd.databinding.ActivityMainBinding
 import pjwstk.s18749.extd.multivnc.ConnectionBean
 import pjwstk.s18749.extd.multivnc.Constants
 import pjwstk.s18749.extd.multivnc.VncCanvasActivity
-import pub.devrel.easypermissions.AppSettingsDialog
-import pub.devrel.easypermissions.EasyPermissions
 import java.io.File
 
 
-class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks,
-    EasyPermissions.RationaleCallbacks {
+class MainActivity : AppCompatActivity() {
+    private val CAMERA_CODE = 123
     private lateinit var binding: ActivityMainBinding
     private val connection: Connection = Connection()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var keysReady = false
+
+    fun keysReady(): Boolean {
+        return keysReady
+    }
 
     private var activityLauncher: ActivityResultLauncher<Intent> =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -90,6 +95,8 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks,
                 fosPriv.close()
                 fosPub.close()
 
+                keysReady = true
+
                 Toast.makeText(
                     this,
                     "Keys generated",
@@ -108,7 +115,14 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks,
             }
 
             binding.genKeys.visibility = View.GONE
+        } else {
+            keysReady = true
         }
+
+        val i = Intent("keysReadyChange")
+        i.putExtra("keysReady", keysReady)
+
+        LocalBroadcastManager.getInstance(this).sendBroadcast(i)
     }
 
     private fun randomPass(len: Int): String {
@@ -149,13 +163,21 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks,
         }
     }
 
-    fun onBeanReady(bean: ConnectionBean) {
+    private fun onBeanReady(bean: ConnectionBean) {
         val intent = Intent(this, VncCanvasActivity::class.java)
 
         intent.putExtra(Constants.CONNECTION, bean)
 
         Log.d("extd", "bean: $bean")
         activityLauncher.launch(intent)
+    }
+
+    fun connectFromQR() {
+        if (hasCameraAccess()) {
+            cameraTask()
+        } else {
+            requestPermissions(arrayOf(android.Manifest.permission.CAMERA), CAMERA_CODE)
+        }
     }
 
     override fun onBackPressed() {
@@ -171,40 +193,22 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks,
 
     private inner class ScreenSlidePagerAdapter(fa: FragmentActivity) :
         FragmentStateAdapter(fa) {
-        override fun getItemCount(): Int = 2
+        override fun getItemCount(): Int = 3
 
         override fun createFragment(position: Int): Fragment {
             if (position == 0) {
-                return PageFragmentSavedConnections()
+                return PageFragmentQuickConnect()
+            } else if (position == 1) {
+                return PageFragmentNewConnection()
             }
 
-            return PageFragmentNewConnection()
+            return PageFragmentConnectionHistory()
         }
     }
 
-    private fun hasCameraAccess(): Boolean {
-        return EasyPermissions.hasPermissions(this, android.Manifest.permission.CAMERA)
-    }
-
-    fun cameraTask() {
-        if (hasCameraAccess()) {
-            var qrScanner = IntentIntegrator(this)
-            qrScanner.setPrompt("scan a QR code")
-            qrScanner.setCameraId(0)
-            qrScanner.setOrientationLocked(true)
-            qrScanner.setBeepEnabled(false)
-            qrScanner.captureActivity = QrCodeCaptureActivity::class.java
-            qrScanner.initiateScan()
-        } else {
-            EasyPermissions.requestPermissions(
-                this,
-                "This app needs access to your camera so you can scan qr codes.",
-                123,
-                android.Manifest.permission.CAMERA
-            )
-        }
-    }
-
+    /**
+     * we need to use this legacy api, because QR code scanned doeas not yet support ActivityResultLauncher
+     */
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         var result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data)
 
@@ -223,11 +227,20 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks,
                 Toast.LENGTH_SHORT
             ).show()
         }
+    }
 
-        if (requestCode == AppSettingsDialog.DEFAULT_SETTINGS_REQ_CODE) {
-            Toast.makeText(this, "Permission Granted", Toast.LENGTH_SHORT).show()
-            cameraTask()
-        }
+    private fun hasCameraAccess(): Boolean {
+        return checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun cameraTask() {
+        var qrScanner = IntentIntegrator(this)
+        qrScanner.setPrompt("scan a QR code")
+        qrScanner.setCameraId(0)
+        qrScanner.setOrientationLocked(true)
+        qrScanner.setBeepEnabled(false)
+        qrScanner.captureActivity = QrCodeCaptureActivity::class.java
+        qrScanner.initiateScan()
     }
 
     override fun onRequestPermissionsResult(
@@ -236,26 +249,16 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks,
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this)
-    }
 
-    override fun onPermissionsDenied(requestCode: Int, perms: MutableList<String>) {
-        if (EasyPermissions.somePermissionPermanentlyDenied(this, perms)) {
-            AppSettingsDialog.Builder(this).build().show()
+        if (requestCode == CAMERA_CODE) {
+            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "camera permission granted", Toast.LENGTH_SHORT).show()
+
+                cameraTask()
+            } else {
+                Toast.makeText(this, "camera permission denied", Toast.LENGTH_SHORT).show()
+            }
         }
-
-        Toast.makeText(this, "Permission Denied", Toast.LENGTH_SHORT).show()
-    }
-
-    override fun onPermissionsGranted(requestCode: Int, perms: MutableList<String>) {
-        Toast.makeText(this, "Permission Granted", Toast.LENGTH_SHORT).show()
-    }
-
-    override fun onRationaleDenied(requestCode: Int) {
-        Toast.makeText(this, "Rationale Denied", Toast.LENGTH_SHORT).show()
-    }
-
-    override fun onRationaleAccepted(requestCode: Int) {
     }
 
     private fun connectFromString(connectionString: String) {
@@ -264,7 +267,7 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks,
         if (args.size == 3) {
             val ips = args[0].split(",")
             val secret = args[2]
-            var port: Int = 0
+            var port = 0
 
             try {
                 port = Integer.parseInt(args[1])

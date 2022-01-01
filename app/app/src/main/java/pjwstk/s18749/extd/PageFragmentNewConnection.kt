@@ -12,6 +12,12 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import java.io.*
 import java.net.*
 import java.util.*
+import android.content.Intent
+
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
+import android.util.Log
 
 
 class PageFragmentNewConnection : Fragment() {
@@ -20,6 +26,7 @@ class PageFragmentNewConnection : Fragment() {
     private lateinit var txSecret: EditText
     private lateinit var btConnect: Button
     private lateinit var fabQrConnect: FloatingActionButton
+    private val receiver = FragmentReceiver()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -74,13 +81,23 @@ class PageFragmentNewConnection : Fragment() {
         btConnect.isEnabled = isValid()
 
         fabQrConnect.setOnClickListener {
-            (requireActivity() as MainActivity).cameraTask()
+            (requireActivity() as MainActivity).connectFromQR()
         }
+
+        requireActivity().registerReceiver(receiver, IntentFilter("fragmentupdater"))
 
         return view
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+
+        requireActivity().unregisterReceiver(receiver)
+    }
+
     private fun isValid(): Boolean {
+        if (!(requireActivity() as MainActivity).keysReady()) return false
+
         try {
             val ip = txIp.text.toString()
             val port = Integer.parseInt(txPort.text.toString())
@@ -101,5 +118,16 @@ class PageFragmentNewConnection : Fragment() {
         }
 
         return false
+    }
+
+    private inner class FragmentReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "keysReadyChange") {
+                val keysReady = intent.getBooleanExtra("keysReady", false)
+                Log.d("extd", "$keysReady keys ready")
+
+                btConnect.isEnabled = isValid()
+            }
+        }
     }
 }

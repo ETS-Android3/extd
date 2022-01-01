@@ -96,8 +96,8 @@
     <string name="port_label">Port:</string>
     <string name="secret_label">Secret:</string>
     <string name="connection_error">Couldn\'t connect :(</string>
-    <string name="saved_connections">Saved connections</string>
-    <string name="available_connections">Available connections</string>
+    <string name="connection_history_title">History</string>
+    <string name="quick_connect_title">Quick connect</string>
     <string name="empty">Nothing\'s here :(</string>
     <string name="no_saved_connections">No saved connections.\nSwipe right to add one.</string>
     <string name="generating_keys">Generating Keys</string>

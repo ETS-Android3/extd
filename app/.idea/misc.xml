@@ -23,6 +23,7 @@
         <entry key="app/src/main/res/layout/editbookmarks.xml" value="0.8197463768115942" />
         <entry key="app/src/main/res/layout/fragment_available_connections.xml" value="0.6520833333333333" />
         <entry key="app/src/main/res/layout/fragment_new_connection.xml" value="0.6489583333333333" />
+        <entry key="app/src/main/res/layout/fragment_quick_connect.xml" value="0.8623188405797102" />
         <entry key="app/src/main/res/layout/fragment_saved_connections.xml" value="0.6489583333333333" />
         <entry key="app/src/main/res/layout/help.xml" value="0.8197463768115942" />
         <entry key="app/src/main/res/layout/importexport.xml" value="0.8197463768115942" />

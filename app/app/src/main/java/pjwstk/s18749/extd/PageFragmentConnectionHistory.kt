@@ -6,10 +6,10 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 
-class PageFragmentSavedConnections : Fragment() {
+class PageFragmentConnectionHistory : Fragment() {
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View = inflater.inflate(R.layout.fragment_saved_connections, container, false)
+    ): View = inflater.inflate(R.layout.fragment_connection_history, container, false)
 }
