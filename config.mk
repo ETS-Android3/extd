@@ -1,8 +1,8 @@
-# paths
-PREFIX = /usr/share/extd
-
 CC = cc
 
+USER=me
 DAEMON_PORT = 1234
 LISTENER_PORT = 1235
-SYSTEMD_SERVICE_DIR=/etc/systemd/system
+SYSTEMD_USER_DIR=/home/$(USER)/.config/systemd/user/
+BIN_DIR = /home/$(USER)/.local/bin
+EXTD_USER_HOME = /home/extd

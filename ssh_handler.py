@@ -3,36 +3,73 @@
 import sys
 import socket
 
-address = ("localhost", __LISTENER_PORT__)
+daemonAddress = ("localhost", __DAEMON_PORT__)
 
-with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-    try:
-        for line in sys.stdin:
-            split = line.split(":")
+try:
+    handled = False
 
-            if len(split) == 6:
-                width = int(split[2])
-                height = int(split[3])
-                password = split[4]
-                secret = split[5]
+    for line in sys.stdin:
+        split = line.split(":")
 
-                if split[0] == "extd" and split[1] == "conn":
-                    s.sendto(f'extd:spawn:{width}:{height}:{password}:{secret.strip()}'.encode(
-                        "utf-8"), address)
+        if split[1] == "conn" and len(split) == 6:
+            width = int(split[2])
+            height = int(split[3])
+            password = split[4]
+            secret = split[5]
 
-                    data, address = s.recvfrom(512)
-                    data = data.decode("utf-8")
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                # authorized_keys = open(
+                # "__USER_HOME_DIR__/.ssh/authorized_keys", "r")
+                # found = False
+                # for line in authorized_keys:
+                #     if f'{secret.strip()}@' in line:
+                #         found = True
+                #         break
 
-                    print(data)
+                # if not found:
+                #     print("extd:error:not_authorized")
+
+                # authorized_keys.close()
+
+                s.sendto(f'extd:spawn:{width}:{height}:{password}:{secret.strip()}'.encode(
+                    "utf-8"), daemonAddress)
+
+                data, daemonAddress = s.recvfrom(512)
+                data = data.decode("utf-8")
+
+                print(data)
+                handled = True
+                break
+
+        elif split[1] == "add" and len(split) == 6:
+            key = split[2]
+            secret = split[3]
+            user = split[4]
+            ip = split[5]
+
+            r_authorized_keys = open("__USER_HOME_DIR__/.ssh/authorized_keys", "r")
+            authorized_keys = open("__USER_HOME_DIR__/.ssh/authorized_keys", "a")
+            entry = f'{key.strip()} {user}:{secret}@{ip}\n'
+
+            found = False
+            for line in r_authorized_keys:
+                if entry in line:
+                    found = True
                     break
 
+            if not found:
+                authorized_keys.write(entry)
+
+            authorized_keys.close()
+            r_authorized_keys.close()
+            print("extd:accepted")
+            handled = True
             break
 
-        s.sendto(f'extd:bad_request'.encode("utf-8"), address)
+    if not handled:
+        print(f'extd:bad_request:got("{line}")')
 
-    except socket.timeout:
-        s.sendto("extd:ssh_wait:timed_out".encode("utf-8"), address)
-        print("extd:ssh_wait:timed_out")
-    except:
-        s.sendto("extd:unknown_error".encode("utf-8"), address)
-        print("extd:unknown_error")
+except socket.timeout:
+    print("extd:ssh_wait:timed_out")
+except Exception as e:
+    print(f'extd:unknown_error:{str(e)}')

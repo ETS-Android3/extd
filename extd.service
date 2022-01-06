@@ -2,14 +2,11 @@
 Description=Extd server daemon
 DefaultDependencies=no
 After=network.target
-Environment=PYTHONUNBUFFERED=1
 
 [Service]
 Type=simple
-User=extd
-Group=extd
 Restart=always
-ExecStart=/usr/bin/python3 __BASE_DIR__/bin/extd_daemon
+ExecStart=/usr/bin/python3 __BIN_DIR__/extd_daemon
 TimeoutStartSec=0
 RemainAfterExit=yes
 

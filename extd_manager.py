@@ -8,19 +8,19 @@ import subprocess
 import socket
 from string import ascii_letters
 import os
-import grp
+# import grp
 
-groups = [grp.getgrgid(g).gr_name for g in os.getgroups()]
+# groups = [grp.getgrgid(g).gr_name for g in os.getgroups()]
 
-hasExtdGroup = False
-for g in groups:
-    if g == "extd":
-        hasExtdGroup = True
-        break
+# hasExtdGroup = False
+# for g in groups:
+#     if g == "extd":
+#         hasExtdGroup = True
+#         break
 
-if not hasExtdGroup:
-    print('add user to "extd" group first')
-    exit(1)
+# if not hasExtdGroup:
+#     print('add user to "extd" group first')
+#     exit(1)
 
 
 def get_ports():
@@ -56,79 +56,32 @@ def get_ips():
     return ips
 
 
-def wait_for_accept_client(secret: str):
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        address = ("localhost", __LISTENER_PORT__)
-        s.bind(address)
-        s.settimeout(5)
-
-        try:
-            print(f'waiting for accept on port {__LISTENER_PORT__}')
-            data, address = s.recvfrom(512)
-            data = data.decode("utf-8")
-            request = data.split(":")
-            width = int(request[2])
-            height = int(request[3])
-            password = request[4]
-            received_secret = request[5]
-            print(f'got request from {address[0]}:{address[1]}')
-
-            if request[0] == "extd" and request[1] == "spawn" and address[0] == "127.0.0.1" and received_secret == secret:
-                print(f'spawning server ({width}x{height}), {password}')
-
-                # server needs to be started as the same user that owns the desktop
-                # otherwise Xorg will not allow to open display :0
-                # since Cookie will not match
-
-                try:
-                    s.sendto("extd:ok".encode("utf-8"), address)
-                    # -once -timeout 30 -localhost -o /usr/share/extd/log.log -threads -passwd "${split[3]}" -clip "${split[1]}x${split[2]}+0+0"
-                    subprocess.check_call(
-                        ["/usr/bin/x11vnc", "-once", "-timeout", "30", "-localhost", "-threads", "-passwd", password, "-clip", f'{width}x{height}+0+0', "-o", "extd.log"])
-
-                except subprocess.CalledProcessError as e:
-                    s.sendto(f'extd:ssh_wait:spawn_error:{e.returncode}'.encode(
-                        "utf-8"), address)
-                    print(f'extd:ssh_wait:spawn_error:{e.returncode}')
-
-                except socket.timeout:
-                    s.sendto("extd:ssh_wait:timed_out".encode("utf-8"), address)
-                    print("extd:ssh_wait:timed_out")
-
-        except KeyboardInterrupt:
-            s.sendto("extd:ssh_wait:cancelled".encode("utf-8"), address)
-
-        except:
-            s.sendto("extd:ssh_wait:unknown_error".encode("utf-8"), address)
-
-
 def listen(port: int, secret: str):
     daemon_addr = ("localhost", __DAEMON_PORT__)
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         try:
             # request daemon to listen on port, for given secret
-            s.sendto(f'extd:listen:{port}:{secret}'.encode(
+            s.sendto(f'extd:listen:{port}:{secret}:{os.getlogin()}'.encode(
                 "utf-8"), daemon_addr)
 
-            #daemon in listening
+            # daemon in listening
             # wait for response
             response = s.recvfrom(512)
             data = response[0].decode("utf-8")
-            print(data)
 
             if data == "extd:accepted":  # daemon accepted client
                 # daemon will give access for client to ssh
                 # when it's done client will attempt to connect over ssh
-                # after connection ssh handler will notify us, what should we do
-                wait_for_accept_client(secret)
+                
+                print("extd:listen:ok")
             else:
-                print(data)  # prints extd daemon error
+                print(f'extd:error:({data})')
 
         except KeyboardInterrupt:
             print("extd:listen:cancelled")
 
-        except:
+        except Exception:
             print("extd:listen:unknown_error")
 
 
