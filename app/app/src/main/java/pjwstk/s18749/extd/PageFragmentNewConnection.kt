@@ -22,6 +22,7 @@ import android.util.Log
 
 class PageFragmentNewConnection : Fragment() {
     private lateinit var txIp: EditText
+    private lateinit var txName: EditText
     private lateinit var txPort: EditText
     private lateinit var txSecret: EditText
     private lateinit var btConnect: Button
@@ -34,6 +35,7 @@ class PageFragmentNewConnection : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         val view: View = inflater.inflate(R.layout.fragment_new_connection, container, false)
+        txName = view.findViewById(R.id.txName)
         txIp = view.findViewById(R.id.txIp)
         txPort = view.findViewById(R.id.txPort)
         txSecret = view.findViewById(R.id.txSecret)
@@ -59,11 +61,12 @@ class PageFragmentNewConnection : Fragment() {
             if (!isValid()) return@setOnClickListener
 
             try {
+                val name = txName.text.toString()
                 val ip = txIp.text.toString()
                 val port = Integer.parseInt(txPort.text.toString())
                 val secret = txSecret.text.toString()
 
-                (activity as MainActivity).connect(ip, port, secret)
+                (activity as MainActivity).connect(ip, port, secret, name)
             } catch (e: Exception) {
             }
         }

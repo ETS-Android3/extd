@@ -19,6 +19,7 @@ import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.google.zxing.integration.android.IntentIntegrator
 import kotlinx.coroutines.*
 import pjwstk.s18749.extd.databinding.ActivityMainBinding
+import pjwstk.s18749.extd.multivnc.COLORMODEL
 import pjwstk.s18749.extd.multivnc.ConnectionBean
 import pjwstk.s18749.extd.multivnc.Constants
 import pjwstk.s18749.extd.multivnc.VncCanvasActivity
@@ -28,12 +29,17 @@ import java.io.File
 class MainActivity : AppCompatActivity() {
     private val CAMERA_CODE = 123
     private lateinit var binding: ActivityMainBinding
-    private val connection: Connection = Connection()
+    private val connectionUtils: ConnectionUtils = ConnectionUtils()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var keysReady = false
+    private lateinit var store: ConnectionStore
 
     fun keysReady(): Boolean {
         return keysReady
+    }
+
+    fun store(): ConnectionStore {
+        return store
     }
 
     private var activityLauncher: ActivityResultLauncher<Intent> =
@@ -51,7 +57,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
 
-        connection.close()
+        connectionUtils.close()
         scope.cancel()
     }
 
@@ -69,6 +75,7 @@ class MainActivity : AppCompatActivity() {
         val data = intent.data.toString()
 
         checkOrGenerateKeys()
+        store = ConnectionStore(File(filesDir, "history.lst"))
 
         if (data.startsWith("extd://")) {
             connectFromString(data)
@@ -76,8 +83,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkOrGenerateKeys() {
-        val priv = File(applicationContext.filesDir, "id_rsa")
-        val pub = File(applicationContext.filesDir, "id_rsa.pub")
+        val priv = File(filesDir, "id_rsa")
+        val pub = File(filesDir, "id_rsa.pub")
 
         if (!priv.exists() || !pub.exists()) {
             binding.genKeys.visibility = View.VISIBLE
@@ -136,20 +143,24 @@ class MainActivity : AppCompatActivity() {
         return password
     }
 
-    fun connect(ip: String, port: Int, secret: String) {
+    fun connect(ip: String, port: Int, secret: String, name: String = "") {
         Toast.makeText(this, "Attempting to connect to $ip:$port ($secret)", Toast.LENGTH_SHORT)
             .show()
-//        val executor: ExecutorService = Executors.newFixedThreadPool(10)
-//
-//        executor.execute{
-//            val bean = connection.connect(ip, port, secret, randomPass(12))
-//            onBeanReady(bean)
-//        }
 
         scope.launch {
             try {
-                val bean = connection.connect(ip, port, secret, randomPass(12))
-                onBeanReady(bean)
+                val conn = connectionUtils.connect(ip, port, secret, randomPass(12), name)
+                val next = ArrayList<Connection>()
+                var old = store.read()
+
+                if (old != null) {
+                    next.addAll(old)
+                }
+
+                next.add(conn)
+
+                store.save(next)
+                onConnectionReady(conn)
 
             } catch (e: RuntimeException) {
                 runOnUiThread {
@@ -163,7 +174,40 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun onBeanReady(bean: ConnectionBean) {
+    fun connect(conn: Connection) {
+        Toast.makeText(this, "Attempting to connect to ${conn.ip}:${conn.port} (${conn.secret})", Toast.LENGTH_SHORT)
+            .show()
+
+        scope.launch {
+            try {
+                connectionUtils.connect(conn)
+                onConnectionReady(conn)
+
+            } catch (e: RuntimeException) {
+                runOnUiThread {
+                    Toast.makeText(
+                        this@MainActivity,
+                        e.message,
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun onConnectionReady(conn: Connection) {
+        val bean = ConnectionBean()
+        bean.address = conn.ip
+        bean.name = conn.name
+        bean.port = conn.port
+        bean.password = conn.password
+        bean.secret = conn.secret
+
+        bean.userName = "extd"
+        bean.useLocalCursor = true // always enable
+        bean.colorModel = COLORMODEL.C24bit.nameString()
+        bean.useRepeater = false
+
         val intent = Intent(this, VncCanvasActivity::class.java)
 
         intent.putExtra(Constants.CONNECTION, bean)
@@ -264,9 +308,10 @@ class MainActivity : AppCompatActivity() {
     private fun connectFromString(connectionString: String) {
         val args = connectionString.replace("extd://", "").split(":")
 
-        if (args.size == 3) {
+        if (args.size == 4) {
             val ips = args[0].split(",")
             val secret = args[2]
+            val name = args[3]
             var port = 0
 
             try {
@@ -283,7 +328,7 @@ class MainActivity : AppCompatActivity() {
             val alertDialogBuilder = AlertDialog.Builder(this)
             alertDialogBuilder.setTitle("Choose ip")
             alertDialogBuilder.setItems(ips.toTypedArray()) { _: DialogInterface, i: Int ->
-                connect(ips[i], port, secret)
+                connect(ips[i], port, secret, name)
             }
             val alertDialog = alertDialogBuilder.create()
             alertDialog.show()

@@ -7,7 +7,7 @@ import java.io.IOException
 import java.io.OutputStream
 import java.lang.RuntimeException
 
-public class KeyUtils {
+class KeyUtils {
     companion object {
         fun saveKeys(kp: KeyPair, privOut: OutputStream, pubOut: OutputStream) {
             try {
@@ -24,6 +24,11 @@ public class KeyUtils {
 
         fun generateKeyPair(): KeyPair {
             return try {
+                /**
+                 * generating the key pair using the KeyPair.genKeyPair function
+                 * from the jsch library, in order to provide a correct key format
+                 * for the later use of KeyPair.load(jsch, priv.absolutePath, pub.absolutePath) function
+                 */
                 val kp = KeyPair.genKeyPair(JSch(), KeyPair.RSA, 2048)
                 kp
             } catch (e: JSchException) {

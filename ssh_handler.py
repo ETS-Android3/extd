@@ -47,8 +47,10 @@ try:
             user = split[4]
             ip = split[5]
 
-            r_authorized_keys = open("__USER_HOME_DIR__/.ssh/authorized_keys", "r")
-            authorized_keys = open("__USER_HOME_DIR__/.ssh/authorized_keys", "a")
+            r_authorized_keys = open(
+                "__USER_HOME_DIR__/.ssh/authorized_keys", "r")
+            authorized_keys = open(
+                "__USER_HOME_DIR__/.ssh/authorized_keys", "a")
             entry = f'{key.strip()} {user}:{secret}@{ip}\n'
 
             found = False

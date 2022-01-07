@@ -37,9 +37,9 @@ install:
 	usermod -s $(EXTD_USER_HOME)/bin/ssh_handler extd
 
 uninstall:
-	[ -f $(BIN_DIR)/extd_manager ] && rm -f $(BIN_DIR)/extd_manager
-	[ -f $(BIN_DIR)/extd_daemon ] && rm -f $(BIN_DIR)/extd_daemon
-	[ -d $(EXTD_USER_HOME) ] && rm -rf $(EXTD_USER_HOME)
+	rm -f $(BIN_DIR)/extd_manager || echo "already clean"
+	rm -f $(BIN_DIR)/extd_daemon || echo "already clean"
+	rm -rf $(EXTD_USER_HOME) || echo "already clean"
 
 	usermod -G "" extd || echo "no use or group"
 	userdel -f -r extd || echo "no user"

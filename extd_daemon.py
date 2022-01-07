@@ -1,22 +1,24 @@
 import socket
 import logging
 import subprocess
+from typing import Callable
 
 logging.basicConfig(filename="extd.log", level=logging.INFO)
 
-def spawn(width: str, height: str, password: str, secret: str, ip: str):
+
+def spawn(width: str, height: str, password: str, then: Callable[[str], str]):
     try:
-        authorized_keys = open("__USER_HOME_DIR__/.ssh/authorized_keys", "r")
+        # authorized_keys = open("__USER_HOME_DIR__/.ssh/authorized_keys", "r")
 
-        found = False
-        for line in authorized_keys:
-            if f' {user}:{secret}@{ip}' in line:
-                found = True
-                break
+        # found = False
+        # for line in authorized_keys:
+        #     if f' {user}:{secret}@{ip}' in line:
+        #         found = True
+        #         break
 
-        if not found:
-            print("extd:bad_request")
-            return "extd:bad_request"
+        # if not found:
+        #     print("extd:bad_request")
+        #     return "extd:bad_request"
 
         print(f'spawning server ({width}x{height}), {password}')
 
@@ -26,10 +28,11 @@ def spawn(width: str, height: str, password: str, secret: str, ip: str):
 
         try:
             # -once -timeout 30 -localhost -o /usr/share/extd/log.log -threads -passwd "${split[3]}" -clip "${split[1]}x${split[2]}+0+0"
-            subprocess.check_call(
+            then("extd:ok")
+            result = subprocess.check_call(
                 ["/usr/bin/x11vnc", "-once", "-timeout", "30", "-localhost", "-threads", "-passwd", password, "-clip", f'{width}x{height}+0+0', "-o", "extd.log"])
-            
-            return "extd:ok"
+
+            return f'extd:spawn_status:{result}'
 
         except subprocess.CalledProcessError as e:
             print(f'extd:ssh_wait:spawn_error:{e.returncode}')
@@ -42,8 +45,8 @@ def spawn(width: str, height: str, password: str, secret: str, ip: str):
     except KeyboardInterrupt:
         return "extd:ssh_wait:cancelled"
 
-    except:
-        return "extd:ssh_wait:unknown_error"
+    except Exception as e:
+        return f'extd:ssh_wait:unknown_error:{str(e)}'
 
 
 def listen(port: int, secret: str, user: str):
@@ -55,17 +58,19 @@ def listen(port: int, secret: str, user: str):
             data, address = s.recvfrom(512)
             data = data.decode("utf-8")
             received_secret, key = data.split(":")
-            logging.info(f'extd:daemon:listen got request from {address[0]}:{str(address[1])}')
+            logging.info(
+                f'extd:daemon:listen got request from {address[0]}:{str(address[1])}')
 
             if received_secret == secret:
                 entry = f'extd:add:{key.strip()}:{secret.strip()}:{user.strip()}:{address[0].strip()}'
                 # logging.info(f'extd:daemon:listen:entry({entry})')
 
-                out = subprocess.check_output(["/usr/bin/ssh", "extd@localhost"], input=entry.encode("utf-8")).strip().decode("utf-8")
+                out = subprocess.check_output(
+                    ["/usr/bin/ssh", "extd@localhost"], input=entry.encode("utf-8")).strip().decode("utf-8")
 
                 if out == "extd:accepted":
                     s.sendto("extd:ok".encode("utf-8"), address)
-                    
+
                 return out
 
             else:
@@ -106,10 +111,9 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 width = int(request[2])
                 height = int(request[3])
                 password = request[4]
-                received_secret = request[5]
 
-                result = spawn(width, height, password, received_secret, address[0])
-                s.sendto(result.encode("utf-8"), address)
+                result = spawn(width, height, password, lambda status: s.sendto(
+                    status.encode("utf-8"), address))
                 logging.info(result)
 
             else:

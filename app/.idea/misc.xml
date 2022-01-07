@@ -6,6 +6,7 @@
         <entry key="../../../../../../layout/custom_preview.xml" value="0.9651041666666667" />
         <entry key="app/src/main/res/drawable/east_black_24dp.xml" value="0.6651041666666667" />
         <entry key="app/src/main/res/drawable/rounded_rectangle.xml" value="0.7067708333333333" />
+        <entry key="app/src/main/res/drawable/west_black_24dp.xml" value="0.9526041666666667" />
         <entry key="app/src/main/res/layout/about.xml" value="0.23425925925925925" />
         <entry key="app/src/main/res/layout/activity_canvas.xml" value="0.5864583333333333" />
         <entry key="app/src/main/res/layout/activity_connection_error.xml" value="0.6552083333333333" />
@@ -22,6 +23,7 @@
         <entry key="app/src/main/res/layout/discovered_servers_list_item.xml" value="0.8197463768115942" />
         <entry key="app/src/main/res/layout/editbookmarks.xml" value="0.8197463768115942" />
         <entry key="app/src/main/res/layout/fragment_available_connections.xml" value="0.6520833333333333" />
+        <entry key="app/src/main/res/layout/fragment_connection_history.xml" value="0.4554204660587639" />
         <entry key="app/src/main/res/layout/fragment_new_connection.xml" value="0.6489583333333333" />
         <entry key="app/src/main/res/layout/fragment_quick_connect.xml" value="0.8623188405797102" />
         <entry key="app/src/main/res/layout/fragment_saved_connections.xml" value="0.6489583333333333" />

@@ -8,6 +8,7 @@ import subprocess
 import socket
 from string import ascii_letters
 import os
+import datetime
 # import grp
 
 # groups = [grp.getgrgid(g).gr_name for g in os.getgroups()]
@@ -73,7 +74,7 @@ def listen(port: int, secret: str):
             if data == "extd:accepted":  # daemon accepted client
                 # daemon will give access for client to ssh
                 # when it's done client will attempt to connect over ssh
-                
+
                 print("extd:listen:ok")
             else:
                 print(f'extd:error:({data})')
@@ -96,11 +97,13 @@ if sys.argv[1] == "add":
     # secret = get_random_string(12)
     secret = "secret"
     ips = get_ips()
+    now = datetime.datetime.now()
 
-    data = f'extd://{",".join(ips)}:{port}:{secret}'
+    name = f'{socket.gethostname()}_{now.strftime("%m-%d-%Y")}'
+    data = f'extd://{",".join(ips)}:{port}:{secret}:{name}'
+
     subprocess.run(["qrencode", "-t", "UTF8", data])
-
     print(
-        f'connect manually: \nips: {", ".join(ips)}\nport: {port}\nsecret: {secret}\n')
+        f'{name}\nconnect manually: \nips: {", ".join(ips)}\nport: {port}\nsecret: {secret}\n')
 
     listen(port, secret)

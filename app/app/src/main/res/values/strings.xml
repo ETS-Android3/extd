@@ -100,6 +100,8 @@
     <string name="quick_connect_title">Quick connect</string>
     <string name="empty">Nothing\'s here :(</string>
     <string name="no_saved_connections">No saved connections.\nSwipe right to add one.</string>
+    <string name="no_history_connections">No saved connections.\nSwipe left to add one.</string>
+
     <string name="generating_keys">Generating Keys</string>
     <string name="key_gen_failure">Key generation failed</string>
 
