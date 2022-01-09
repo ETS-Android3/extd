@@ -24,6 +24,8 @@ import pjwstk.s18749.extd.multivnc.ConnectionBean
 import pjwstk.s18749.extd.multivnc.Constants
 import pjwstk.s18749.extd.multivnc.VncCanvasActivity
 import java.io.File
+import java.util.*
+import kotlin.collections.ArrayList
 
 
 class MainActivity : AppCompatActivity() {
@@ -52,6 +54,8 @@ class MainActivity : AppCompatActivity() {
                     Log.w("extd", "got data $argsData")
                 }
             }
+
+            connectionUtils.close()
         }
 
     override fun onDestroy() {
@@ -150,16 +154,23 @@ class MainActivity : AppCompatActivity() {
         scope.launch {
             try {
                 val conn = connectionUtils.connect(ip, port, secret, randomPass(12), name)
-                val next = ArrayList<Connection>()
-                var old = store.read()
+                val next = ArrayList<ConnectionListItem>()
+                var old: List<ConnectionListItem>? = null
+
+                try {
+                    old = store.read()
+                } catch (e: RuntimeException) {
+                }
+
+                conn.lastConnected = Date()
 
                 if (old != null) {
                     next.addAll(old)
                 }
 
-                next.add(conn)
+                next.add(ConnectionListItem(false, conn))
 
-                store.save(next)
+                store.save(next.toList())
                 onConnectionReady(conn)
 
             } catch (e: RuntimeException) {
@@ -210,9 +221,18 @@ class MainActivity : AppCompatActivity() {
 
         val intent = Intent(this, VncCanvasActivity::class.java)
 
+        runOnUiThread {
+            Toast.makeText(
+                this@MainActivity,
+                "attempting to connect: $conn",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+
         intent.putExtra(Constants.CONNECTION, bean)
 
-        Log.d("extd", "bean: $bean")
+        Log.d("extd", "connection: $conn")
+
         activityLauncher.launch(intent)
     }
 
@@ -264,12 +284,6 @@ class MainActivity : AppCompatActivity() {
 
         } else {
             super.onActivityResult(requestCode, resultCode, data)
-
-            Toast.makeText(
-                this,
-                "No result found",
-                Toast.LENGTH_SHORT
-            ).show()
         }
     }
 

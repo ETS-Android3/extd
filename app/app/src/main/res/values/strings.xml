@@ -102,7 +102,10 @@
     <string name="no_saved_connections">No saved connections.\nSwipe right to add one.</string>
     <string name="no_history_connections">No saved connections.\nSwipe left to add one.</string>
 
+    <string name="delete_history_entry">delete</string>
+    <string name="connect_history_entry">connect</string>
     <string name="generating_keys">Generating Keys</string>
+    <string name="loading_history">Loading history...</string>
     <string name="key_gen_failure">Key generation failed</string>
 
     <!-- OpenKeychain not installed -->

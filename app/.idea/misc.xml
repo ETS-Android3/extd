@@ -24,7 +24,7 @@
         <entry key="app/src/main/res/layout/editbookmarks.xml" value="0.8197463768115942" />
         <entry key="app/src/main/res/layout/fragment_available_connections.xml" value="0.6520833333333333" />
         <entry key="app/src/main/res/layout/fragment_connection_history.xml" value="0.4554204660587639" />
-        <entry key="app/src/main/res/layout/fragment_new_connection.xml" value="0.6489583333333333" />
+        <entry key="app/src/main/res/layout/fragment_new_connection.xml" value="0.25" />
         <entry key="app/src/main/res/layout/fragment_quick_connect.xml" value="0.8623188405797102" />
         <entry key="app/src/main/res/layout/fragment_saved_connections.xml" value="0.6489583333333333" />
         <entry key="app/src/main/res/layout/help.xml" value="0.8197463768115942" />
@@ -33,6 +33,7 @@
         <entry key="app/src/main/res/layout/metakey.xml" value="0.8197463768115942" />
         <entry key="app/src/main/res/layout/new_conn_element.xml" value="0.8197463768115942" />
         <entry key="app/src/main/res/layout/server_list_item.xml" value="0.5869791666666667" />
+        <entry key="app/src/main/res/layout/server_list_item_menu.xml" value="0.9510416666666667" />
         <entry key="app/src/main/res/layout/zoom_controls.xml" value="0.5864583333333333" />
         <entry key="app/src/main/res/menu/vnccanvasactivitymenu.xml" value="0.690625" />
       </map>

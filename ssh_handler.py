@@ -11,11 +11,10 @@ try:
     for line in sys.stdin:
         split = line.split(":")
 
-        if split[1] == "conn" and len(split) == 6:
+        if split[1] == "conn" and len(split) == 5:
             width = int(split[2])
             height = int(split[3])
             password = split[4]
-            secret = split[5]
 
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 # authorized_keys = open(
@@ -31,7 +30,7 @@ try:
 
                 # authorized_keys.close()
 
-                s.sendto(f'extd:spawn:{width}:{height}:{password}:{secret.strip()}'.encode(
+                s.sendto(f'extd:spawn:{width}:{height}:{password}'.encode(
                     "utf-8"), daemonAddress)
 
                 data, daemonAddress = s.recvfrom(512)

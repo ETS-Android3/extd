@@ -4,19 +4,22 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout xmlns:android="http://schemas.android.com/apk/res/android"
-        xmlns:app="http://schemas.android.com/apk/res-auto"
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/rfConnectionHistory"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent">
 
         <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
+            android:layout_height="match_parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent">
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:orientation="vertical">
 
                 <LinearLayout
@@ -33,28 +36,19 @@
 
                         <TextView
                             android:id="@+id/txTitleConnectionHistory"
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_gravity="left"
+                            android:layout_gravity="start"
                             android:layout_weight="1"
                             android:text="@string/connection_history_title"
                             android:textSize="20sp" />
-
-                        <TextView
-                            android:id="@+id/txConnectionHistoryCount"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_gravity="center_vertical"
-                            android:gravity="left"
-                            android:text="0"
-                            android:textSize="16sp" />
 
                         <ProgressBar
                             android:id="@+id/spLoading"
                             android:layout_width="20dp"
                             android:layout_height="20dp"
                             android:layout_gravity="center_vertical"
-                            android:gravity="left"
+                            android:gravity="start"
                             android:visibility="gone" />
                     </LinearLayout>
 
@@ -67,19 +61,22 @@
                         <androidx.recyclerview.widget.RecyclerView
                             android:id="@+id/rvConnectionHistoryList"
                             android:layout_width="match_parent"
-                            android:layout_height="match_parent"
+                            android:layout_height="wrap_content"
                             android:clipToPadding="true"
+                            android:paddingBottom="20dp"
+                            android:layout_marginBottom="20dp"
                             android:nestedScrollingEnabled="false"
                             android:overScrollMode="never"
                             android:visibility="gone" />
 
                         <LinearLayout
+                            android:id="@+id/llConnectionHistoryListEmpty"
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
-                            android:orientation="vertical">
+                            android:orientation="vertical"
+                            android:visibility="gone">
 
                             <ImageView
-                                android:id="@+id/emptyConnectionHistoryList"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_gravity="center"
@@ -104,6 +101,26 @@
                                 app:srcCompat="@drawable/west_black_24dp" />
                         </LinearLayout>
 
+                        <LinearLayout
+                            android:id="@+id/llConnectionHistoryListLoading"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:orientation="vertical">
+
+                            <ProgressBar
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_gravity="center" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_gravity="center"
+                                android:gravity="center"
+                                android:text="@string/loading_history"
+                                android:textSize="20sp" />
+
+                        </LinearLayout>
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>

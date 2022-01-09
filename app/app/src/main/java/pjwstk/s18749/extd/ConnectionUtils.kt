@@ -7,12 +7,11 @@ import com.jcraft.jsch.JSch
 import com.jcraft.jsch.JSchException
 import com.jcraft.jsch.KeyPair
 import com.jcraft.jsch.Session
-import pjwstk.s18749.extd.multivnc.COLORMODEL
-import pjwstk.s18749.extd.multivnc.ConnectionBean
 import java.io.*
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.util.*
 
 class ConnectionUtils() : Closeable {
     private val jsch = JSch()
@@ -48,7 +47,13 @@ class ConnectionUtils() : Closeable {
         }
     }
 
-    private fun prepareConnection(host: String, port: Int, pass: String, name: String, secret: String): Connection {
+    private fun prepareConnection(
+        host: String,
+        port: Int,
+        pass: String,
+        name: String,
+        secret: String
+    ): Connection {
         val trimmedPass = pass.trim()
 
         if (trimmedPass.isEmpty()) {
@@ -59,7 +64,7 @@ class ConnectionUtils() : Closeable {
             throw RuntimeException("prepare connection: invalid port: $port")
         }
 
-        val conn = Connection(name, "127.0.0.1", host, port, secret, pass)
+        val conn = Connection(name, "127.0.0.1", host, port, secret, pass, Date())
 
 //        conn.userName = "extd"
 //        conn.useLocalCursor = true // always enable
@@ -123,7 +128,7 @@ class ConnectionUtils() : Closeable {
         }
     }
 
-    private fun requestServer(secret: String, pass: String) {
+    private fun requestServer(pass: String) {
         if (!this::session.isInitialized || !session.isConnected) {
             throw RuntimeException("request server: session not open")
         }
@@ -139,7 +144,7 @@ class ConnectionUtils() : Closeable {
 
                 with(BufferedReader(InputStreamReader(inputStream))) {
                     with(outputStream) {
-                        write("extd:conn:$width:$height:$pass:$secret\n".toByteArray())
+                        write("extd:conn:$width:$height:$pass\n".toByteArray())
                         flush()
                     }
 
@@ -164,7 +169,7 @@ class ConnectionUtils() : Closeable {
     fun connect(ip: String, port: Int, secret: String, pass: String, name: String): Connection {
         preConnect(ip, port, secret)
         prepareSession(ip)
-        requestServer(secret, pass)
+        requestServer(pass)
 
         val localHost = "127.0.0.1"
         val localPort = session.setPortForwardingL(0, localHost, 5900)
@@ -175,10 +180,10 @@ class ConnectionUtils() : Closeable {
 
     fun connect(connection: Connection) {
         prepareSession(connection.originalIp) // tunnel to original ip
-        requestServer(connection.secret, connection.password)
+        requestServer(connection.password)
 
         val localHost = "127.0.0.1"
-        val localPort = session.setPortForwardingL(0, localHost, 5900)
+        val localPort = session.setPortForwardingL(connection.port, localHost, 5900)
 
         Log.d("extd", "listening on $localPort")
     }

@@ -446,11 +446,48 @@ JNIEXPORT jboolean JNICALL Java_pjwstk_s18749_extd_multivnc_VNCConn_rfbInit(
   rfbClientSetClientData(cl, VNCCONN_OBJ_ID, obj);
   rfbClientSetClientData(cl, VNCCONN_ENV_ID, env);
 
-  if (!rfbInitClient(cl, 0, NULL)) {
+  int res = rfbInitClient(cl, 0, NULL);
+  if (res != 0) {
     setRfbClient(env, obj, 0);  //  rfbInitClient() calls rfbClientCleanup() on
                                 //  failure, but this does not zero the ptr
-    log_obj_tostring(env, obj, ANDROID_LOG_ERROR,
-                     "rfbInit() connection failed. Cleanup by library.");
+
+    if (res == 1) {
+      log_obj_tostring(
+              env, obj, ANDROID_LOG_ERROR,
+              "rfbInit() connection failed. Cleanup by library. No host");
+    } else if (res == 2){
+      log_obj_tostring(
+              env, obj, ANDROID_LOG_ERROR,
+              "rfbInit() connection failed. Cleanup by library. ConnectToRFBRepeater failed");
+    } else if (res == 3) {
+      log_obj_tostring(
+              env, obj, ANDROID_LOG_ERROR,
+              "rfbInit() connection failed. Cleanup by library. ConnectToRFBServer failed");
+    } else if (res == 4) {
+      log_obj_tostring(
+              env, obj, ANDROID_LOG_ERROR,
+              "rfbInit() connection failed. Cleanup by library. InitialiseRFBConnection failed");
+    } else if (res == 5) {
+      log_obj_tostring(
+              env, obj, ANDROID_LOG_ERROR,
+              "rfbInit() connection failed. Cleanup by library. MallocFrameBuffer failed");
+    } else if (res == 6) {
+      log_obj_tostring(
+              env, obj, ANDROID_LOG_ERROR,
+              "rfbInit() connection failed. Cleanup by library. SetFormatAndEncodings failed");
+    } else if (res == 7) {
+      log_obj_tostring(
+              env, obj, ANDROID_LOG_ERROR,
+              "rfbInit() connection failed. Cleanup by library. SendScaleSetting failed");
+    } else if (res == 8) {
+      log_obj_tostring(
+              env, obj, ANDROID_LOG_ERROR,
+              "rfbInit() connection failed. Cleanup by library. SendFramebufferUpdateRequest failed");
+    } else {
+      log_obj_tostring(
+              env, obj, ANDROID_LOG_ERROR,
+              "rfbInit() connection failed. Cleanup by library. Unknown error.");
+    }
     return JNI_FALSE;
   }
 

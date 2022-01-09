@@ -5,23 +5,27 @@ import java.io.*
 class ConnectionStore(
     private val store: File
 ) {
-    fun save(connections: List<Connection>) {
-        ObjectOutputStream(FileOutputStream(store)).use{ it.writeObject(connections) }
+    fun save(connections: List<ConnectionListItem>?) {
+        if (connections != null) {
+            ObjectOutputStream(FileOutputStream(store)).use { it.writeObject(connections) }
+        }
     }
 
 
-    fun read(): List<Connection>? {
-        var list: List<Connection>? = null
-
+    fun read(): List<ConnectionListItem>? {
         if (store.exists()) {
-            ObjectInputStream(FileInputStream(store)).use {
-                list = when (val connections = it.readObject()) {
-                    is List<*> -> connections as List<Connection>
-                    else -> null
+            try {
+                ObjectInputStream(FileInputStream(store)).use {
+                    return when (val connections = it.readObject()) {
+                        is List<*> -> connections as List<ConnectionListItem>
+                        else -> null
+                    }
                 }
+            } catch (e: InvalidClassException) {
+                throw RuntimeException("could not load saved connections ${e.message}")
             }
         }
 
-        return list
+        return null
     }
 }

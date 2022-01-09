@@ -1,9 +1,11 @@
 package pjwstk.s18749.extd
 
 import android.os.Bundle
+import android.transition.TransitionManager
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
@@ -11,23 +13,34 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import kotlinx.coroutines.*
 
 class PageFragmentConnectionHistory : Fragment() {
-    private var history: List<Connection>? = null
-    private val historyConnectionsAdapter = ConnectionListAdapter(::onListItemClick)
+    private var history: List<ConnectionListItem>? = null
+    private val historyConnectionsAdapter =
+        ConnectionListAdapter(::onListItemClick, ::onListItemRemove, ::onListItemConnect)
 
     private lateinit var rv: RecyclerView
-    private lateinit var emptyMsg: TextView
-    private lateinit var elementsCount: TextView
+    private lateinit var emptyMsg: LinearLayout
+    private lateinit var loading: LinearLayout
     private lateinit var rf: SwipeRefreshLayout
     private lateinit var spLoading: ProgressBar
     private lateinit var title: TextView
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    override fun onDestroy() {
+        super.onDestroy()
+
+        scope.cancel()
+    }
 
     fun updateViews() {
-        val next = (requireActivity() as MainActivity).store().read()
+        val next = history
 
         if (next != null) {
-            historyConnectionsAdapter.update(next)
+            historyConnectionsAdapter.update(next.toList())
+
+//            TransitionManager.beginDelayedTransition(rv)
 
             if (next.isEmpty()) {
                 rv.visibility = View.GONE
@@ -36,8 +49,9 @@ class PageFragmentConnectionHistory : Fragment() {
                 rv.visibility = View.VISIBLE
                 emptyMsg.visibility = View.GONE
             }
-
-            emptyMsg.text = next.size.toString()
+        } else {
+            rv.visibility = View.GONE
+            emptyMsg.visibility = View.VISIBLE
         }
     }
 
@@ -48,8 +62,8 @@ class PageFragmentConnectionHistory : Fragment() {
     ): View {
         val view: View = inflater.inflate(R.layout.fragment_connection_history, container, false)
         rv = view.findViewById(R.id.rvConnectionHistoryList)
-        emptyMsg = view.findViewById(R.id.txConnectionHistoryListEmpty)
-        elementsCount = view.findViewById(R.id.txConnectionHistoryCount)
+        emptyMsg = view.findViewById(R.id.llConnectionHistoryListEmpty)
+        loading = view.findViewById(R.id.llConnectionHistoryListLoading)
         rf = view.findViewById(R.id.rfConnectionHistory)
         spLoading = view.findViewById(R.id.spLoading)
         title = view.findViewById(R.id.txTitleConnectionHistory)
@@ -57,28 +71,95 @@ class PageFragmentConnectionHistory : Fragment() {
         rv.setHasFixedSize(true)
         rv.layoutManager = LinearLayoutManager(requireContext())
         rv.adapter = historyConnectionsAdapter
+        registerForContextMenu(rv)
 
-        history = (requireActivity() as MainActivity).store().read()
-
-        updateViews()
+        loadList()
 
         rf.setOnRefreshListener {
-            updateViews()
-            rf.isRefreshing = false
+            loadList()
         }
 
         return view
     }
 
+    private fun loadList() {
+        if (history == null || history!!.isEmpty()) {
+            loading.visibility = View.VISIBLE
+        }
+
+        scope.launch {
+            try {
+                history = (requireActivity() as MainActivity).store().read()
+            } catch (e: RuntimeException) {
+                requireActivity().runOnUiThread {
+                    Toast.makeText(
+                        requireActivity(),
+                        e.message,
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+
+            requireActivity().runOnUiThread {
+                loading.visibility = View.GONE
+                rf.isRefreshing = false
+                updateViews()
+            }
+        }
+    }
+
+    private fun saveList(list: List<ConnectionListItem>) {
+        scope.launch {
+            (requireActivity() as MainActivity).store().save(list)
+
+            requireActivity().runOnUiThread {
+                updateViews()
+            }
+        }
+    }
+
     private fun onListItemClick(position: Int) {
-        if (historyConnectionsAdapter.list.size > position) {
+        val next = history
+
+        if (next != null && next.size > position) {
+            var i = 0
+            history = next.map { old ->
+                when (i++ == position) {
+                    true -> ConnectionListItem(!old.isOpen, old.connection)
+                    else -> old
+                }
+            }
+
+            saveList(history!!)
+        }
+    }
+
+    private fun onListItemRemove(position: Int) {
+        val next = history
+
+        if (next != null && next.size > position) {
+            var i = 0
+
+            history = next.filter { _ -> i++ != position }
+            saveList(history!!)
+        }
+    }
+
+    private fun onListItemConnect(position: Int) {
+        val next = history
+
+        if (!(requireActivity() as MainActivity).keysReady()) {
             Toast.makeText(
-                context,
-                historyConnectionsAdapter.list[position].ip,
-                Toast.LENGTH_SHORT
-            )
-                .show()
-            (activity as MainActivity).connect(historyConnectionsAdapter.list[position])
+                requireActivity(),
+                "keys not ready",
+                Toast.LENGTH_LONG
+            ).show()
+
+            return
+        }
+
+        if (next != null && next.size > position) {
+            (activity as MainActivity).connect(next[position].connection)
         }
     }
 }

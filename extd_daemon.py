@@ -17,10 +17,10 @@ def spawn(width: str, height: str, password: str, then: Callable[[str], str]):
         #         break
 
         # if not found:
-        #     print("extd:bad_request")
+        #     logging.info("extd:bad_request")
         #     return "extd:bad_request"
 
-        print(f'spawning server ({width}x{height}), {password}')
+        logging.info(f'spawning server ({width}x{height}), {password}')
 
         # server needs to be started as the same user that owns the desktop
         # otherwise Xorg will not allow to open display :0
@@ -28,9 +28,25 @@ def spawn(width: str, height: str, password: str, then: Callable[[str], str]):
 
         try:
             # -once -timeout 30 -localhost -o /usr/share/extd/log.log -threads -passwd "${split[3]}" -clip "${split[1]}x${split[2]}+0+0"
-            then("extd:ok")
             result = subprocess.check_call(
-                ["/usr/bin/x11vnc", "-once", "-timeout", "30", "-localhost", "-threads", "-passwd", password, "-clip", f'{width}x{height}+0+0', "-o", "extd.log"])
+                [
+                    "/usr/bin/x11vnc",
+                    "-once",
+                    "-timeout",
+                    "30",
+                    "-localhost",
+                    "-threads",
+                    "-passwd",
+                    password,
+                    # "-clip",
+                    # f'{width}x{height}+0+0',
+                    # "-geometry",
+                    # f'{width}x{height}',
+                    "-o",
+                    "extd.log",
+                    "-bg"
+                ])
+            then("extd:ok")
 
             return f'extd:spawn_status:{result}'
 
@@ -63,13 +79,17 @@ def listen(port: int, secret: str, user: str):
 
             if received_secret == secret:
                 entry = f'extd:add:{key.strip()}:{secret.strip()}:{user.strip()}:{address[0].strip()}'
-                # logging.info(f'extd:daemon:listen:entry({entry})')
+                logging.info(f'extd:daemon:listen:add({entry})')
 
                 out = subprocess.check_output(
                     ["/usr/bin/ssh", "extd@localhost"], input=entry.encode("utf-8")).strip().decode("utf-8")
 
                 if out == "extd:accepted":
+                    logging.info("extd:daemon:listen:accepted")
                     s.sendto("extd:ok".encode("utf-8"), address)
+
+                else:
+                    logging.error(f'extd:daemon:listen:error:{out}')
 
                 return out
 
@@ -106,8 +126,9 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 result = listen(port, secret, user)
                 s.sendto(result.encode("utf-8"), address)
                 logging.info(result)
+                print(result)
 
-            elif request[0] == "extd" and request[1] == "spawn" and address[0] == "127.0.0.1":
+            elif len(request) == 5 and request[0] == "extd" and request[1] == "spawn" and address[0] == "127.0.0.1":
                 width = int(request[2])
                 height = int(request[3])
                 password = request[4]
@@ -115,12 +136,15 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 result = spawn(width, height, password, lambda status: s.sendto(
                     status.encode("utf-8"), address))
                 logging.info(result)
+                print(result)
 
             else:
                 s.sendto("extd:bad_request".encode("utf-8"), address)
                 logging.info("extd:daemon:bad_request")
+                print("extd:daemon:bad_request")
         except KeyboardInterrupt:
             break
 
         except Exception as e:
             logging.error(f'extd:daemon:unknown_error:{str(e)}')
+            print(f'extd:daemon:unknown_error:{str(e)}')
