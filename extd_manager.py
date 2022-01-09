@@ -2,6 +2,7 @@
 
 import sys
 import random
+from Crypto.PublicKey import RSA
 import netifaces
 import ipaddress
 import subprocess
@@ -9,19 +10,9 @@ import socket
 from string import ascii_letters
 import os
 import datetime
-# import grp
-
-# groups = [grp.getgrgid(g).gr_name for g in os.getgroups()]
-
-# hasExtdGroup = False
-# for g in groups:
-#     if g == "extd":
-#         hasExtdGroup = True
-#         break
-
-# if not hasExtdGroup:
-#     print('add user to "extd" group first')
-#     exit(1)
+import base64
+import rsa
+import key_utils
 
 
 def get_ports():
@@ -57,14 +48,19 @@ def get_ips():
     return ips
 
 
-def listen(port: int, secret: str):
+def listen(port: int, secret: str, public_key):
     daemon_addr = ("localhost", __DAEMON_PORT__)
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         try:
+            message = f'extd:listen:{port}:{secret}:{os.getlogin()}'.encode(
+                "utf-8")
+            # encrypt the message
+            message = rsa.encrypt(message, public_key)
+            message = base64.b64encode(message)
+
             # request daemon to listen on port, for given secret
-            s.sendto(f'extd:listen:{port}:{secret}:{os.getlogin()}'.encode(
-                "utf-8"), daemon_addr)
+            s.sendto(message, daemon_addr)
 
             # daemon in listening
             # wait for response
@@ -82,13 +78,15 @@ def listen(port: int, secret: str):
         except KeyboardInterrupt:
             print("extd:listen:cancelled")
 
-        except Exception:
-            print("extd:listen:unknown_error")
+        except Exception as e:
+            print(f'extd:listen:unknown_error{str(e)}')
 
 
 if len(sys.argv) < 2:
     print("not enough args")
     exit(1)
+
+(priv, public_key) = key_utils.load_keys()
 
 if sys.argv[1] == "add":
     lower, upper = get_ports()
@@ -106,4 +104,4 @@ if sys.argv[1] == "add":
     print(
         f'{name}\nconnect manually: \nips: {", ".join(ips)}\nport: {port}\nsecret: {secret}\n')
 
-    listen(port, secret)
+    listen(port, secret, public_key)

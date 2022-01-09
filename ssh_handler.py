@@ -1,8 +1,22 @@
 #!/usr/bin/python3
 
+import base64
 import sys
 import socket
+import rsa
 
+
+def load_keys():
+    with open("__PRIVATE_KEY__", mode='rb') as priv:
+        private_key = rsa.PrivateKey.load_pkcs1(priv.read(), "PEM")
+
+    with open("__PUBLIC_KEY__", mode='rb') as pub:
+        public_key = rsa.PublicKey.load_pkcs1_openssl_pem(pub.read())
+
+    return (private_key, public_key)
+
+
+(priv, public_key) = load_keys()
 daemonAddress = ("localhost", __DAEMON_PORT__)
 
 try:
@@ -30,8 +44,11 @@ try:
 
                 # authorized_keys.close()
 
-                s.sendto(f'extd:spawn:{width}:{height}:{password}'.encode(
-                    "utf-8"), daemonAddress)
+                # encrypt the message
+                message = rsa.encrypt(
+                    f'extd:spawn:{width}:{height}:{password}', public_key)
+                message = base64.b64encode(message)
+                s.sendto(message, daemonAddress)
 
                 data, daemonAddress = s.recvfrom(512)
                 data = data.decode("utf-8")

@@ -2,6 +2,9 @@ import socket
 import logging
 import subprocess
 from typing import Callable
+import base64
+import rsa
+import key_utils
 
 logging.basicConfig(filename="extd.log", level=logging.INFO)
 
@@ -82,7 +85,7 @@ def listen(port: int, secret: str, user: str):
                 logging.info(f'extd:daemon:listen:add({entry})')
 
                 out = subprocess.check_output(
-                    ["/usr/bin/ssh", "extd@localhost"], input=entry.encode("utf-8")).strip().decode("utf-8")
+                    ["/usr/bin/ssh", "-i", "__PRIVATE_SSH_KEY__", "extd@localhost"], input=entry.encode("utf-8")).strip().decode("utf-8")
 
                 if out == "extd:accepted":
                     logging.info("extd:daemon:listen:accepted")
@@ -104,17 +107,22 @@ def listen(port: int, secret: str, user: str):
             return "extd:daemon:listen:unknown_error"
 
 
+(private_key, public_key) = key_utils.load_keys()
 address = ("localhost", __DAEMON_PORT__)
 
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
     s.bind(address)
-    logging.info(f'extd:daemon extd listening on port {__DAEMON_PORT__}')
+    logging.info(
+        f'extd:daemon extd listening on port {__DAEMON_PORT__}')
 
     while True:
         try:
             data, address = s.recvfrom(512)
-            data = data.decode("utf-8")
-            request = data.split(":")
+            logging.info(f'got data: {data.decode("utf-8")}')
+
+            decoded = rsa.decrypt(base64.b64decode(data), private_key)
+            request = decoded.decode("utf-8").split(":")
+
             logging.info("extd:daemon got request from " +
                          address[0] + ":" + str(address[1]))
 
