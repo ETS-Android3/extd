@@ -322,7 +322,7 @@ class MainActivity : AppCompatActivity() {
     private fun connectFromString(connectionString: String) {
         val args = connectionString.replace("extd://", "").split(":")
 
-        if (args.size == 4) {
+        if (args.size == 5) {
             val ips = args[0].split(",")
             val secret = args[2]
             val name = args[3]

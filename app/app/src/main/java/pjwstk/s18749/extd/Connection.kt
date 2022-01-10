@@ -8,6 +8,7 @@ data class Connection(
     val ip: String,
     val originalIp: String,
     val port: Int,
+    val daemonPort: Int,
     val secret: String,
     val password: String,
     val createdAt: Date

@@ -3,7 +3,6 @@ import logging
 import subprocess
 from typing import Callable
 import base64
-import rsa
 import key_utils
 
 logging.basicConfig(filename="extd.log", level=logging.INFO)
@@ -74,6 +73,7 @@ def listen(port: int, secret: str, user: str):
         logging.info(f'extd:daemon:listen listening for client on port {port}')
 
         try:
+            # listens for the initial request from the device that wants to be added
             data, address = s.recvfrom(512)
             data = data.decode("utf-8")
             received_secret, key = data.split(":")
@@ -84,43 +84,63 @@ def listen(port: int, secret: str, user: str):
                 entry = f'extd:add:{key.strip()}:{secret.strip()}:{user.strip()}:{address[0].strip()}'
                 logging.info(f'extd:daemon:listen:add({entry})')
 
-                out = subprocess.check_output(
-                    ["/usr/bin/ssh", "-i", "__PRIVATE_SSH_KEY__", "extd@localhost"], input=entry.encode("utf-8")).strip().decode("utf-8")
+                # encrypt and pass to handler
+                entry = private_key.encrypt(entry.encode("utf-8"))
+                entry = base64.b64encode(entry)
 
-                if out == "extd:accepted":
-                    logging.info("extd:daemon:listen:accepted")
-                    s.sendto("extd:ok".encode("utf-8"), address)
+                try:
+                    out = subprocess.check_output(
+                        ["/usr/bin/ssh", "-i", "__PRIVATE_SSH_KEY__", "extd@localhost"],
+                        input=f'daemon:{entry.decode("utf-8")}'.encode("utf-8")
+                    )
 
-                else:
-                    logging.error(f'extd:daemon:listen:error:{out}')
+                    out = out.strip()
 
-                return out
+                    logging.info(out)
+                    # decrypt response
+                    out = private_key.decrypt(base64.b64decode(out))
+                    out = out.decode("utf-8")
+
+                    if out == "extd:accepted":
+                        logging.info("extd:daemon:listen:accepted")
+                        # send result to the requesting device
+                        s.sendto(f'extd:ok:{__DAEMON_PORT__}'.encode(
+                            "utf-8"), address)
+
+                    else:
+                        logging.error(f'extd:daemon:listen:error:{out}')
+
+                    return out
+
+                except subprocess.CalledProcessError as e:
+                    msg = f'extd:daemon:listen:error:handler_request_add_returned={e.output.decode("utf-8")}'
+
+                    logging.error(msg)
+                    return msg
 
             else:
-                logging.info("extd:daemon:listen invalid credentials",
-                             received_secret, secret)
+                logging.error("extd:daemon:listen invalid credentials",
+                              received_secret, secret)
         except KeyboardInterrupt:
             return "extd:daemon:listen:cancelled"
 
         except Exception as e:
-            logging.error(f'extd:daemon:listen:unknown_error:{str(e)}')
             return "extd:daemon:listen:unknown_error"
 
 
-(private_key, public_key) = key_utils.load_keys()
+private_key = key_utils.load_key()
 address = ("localhost", __DAEMON_PORT__)
 
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
     s.bind(address)
-    logging.info(
-        f'extd:daemon extd listening on port {__DAEMON_PORT__}')
+    logging.info(f'extd:daemon extd listening on port {__DAEMON_PORT__}')
 
     while True:
         try:
             data, address = s.recvfrom(512)
             logging.info(f'got data: {data.decode("utf-8")}')
 
-            decoded = rsa.decrypt(base64.b64decode(data), private_key)
+            decoded = private_key.decrypt(base64.b64decode(data))
             request = decoded.decode("utf-8").split(":")
 
             logging.info("extd:daemon got request from " +
@@ -132,17 +152,28 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 user = request[4]
 
                 result = listen(port, secret, user)
-                s.sendto(result.encode("utf-8"), address)
                 logging.info(result)
                 print(result)
+
+                # encrypt and send back
+                result = private_key.encrypt(result.encode("utf-8"))
+                result = base64.b64encode(result)
+
+                s.sendto(result, address)
 
             elif len(request) == 5 and request[0] == "extd" and request[1] == "spawn" and address[0] == "127.0.0.1":
                 width = int(request[2])
                 height = int(request[3])
                 password = request[4]
 
-                result = spawn(width, height, password, lambda status: s.sendto(
-                    status.encode("utf-8"), address))
+                def then(result):
+                    # encrypt and send back
+                    result = private_key.encrypt(result.encode("utf-8"))
+                    result = base64.b64encode(result)
+
+                    s.sendto(result, address)
+
+                result = spawn(width, height, password, then)
                 logging.info(result)
                 print(result)
 

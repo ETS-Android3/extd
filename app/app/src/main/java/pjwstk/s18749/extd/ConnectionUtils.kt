@@ -50,6 +50,7 @@ class ConnectionUtils() : Closeable {
     private fun prepareConnection(
         host: String,
         port: Int,
+        daemonPort: Int,
         pass: String,
         name: String,
         secret: String
@@ -64,7 +65,7 @@ class ConnectionUtils() : Closeable {
             throw RuntimeException("prepare connection: invalid port: $port")
         }
 
-        val conn = Connection(name, "127.0.0.1", host, port, secret, pass, Date())
+        val conn = Connection(name, "127.0.0.1", host, port, daemonPort, secret, pass, Date())
 
 //        conn.userName = "extd"
 //        conn.useLocalCursor = true // always enable
@@ -95,7 +96,7 @@ class ConnectionUtils() : Closeable {
         return baos.toString()
     }
 
-    private fun preConnect(ip: String, port: Int, secret: String) {
+    private fun preConnect(ip: String, port: Int, secret: String): Int {
         if (port <= 1024 || port > 65_535) {
             throw RuntimeException("prepare connection: invalid port: $port")
         }
@@ -120,6 +121,21 @@ class ConnectionUtils() : Closeable {
                     throw RuntimeException("requesting server: $result")
                 }
 
+                val split = result.split(":")
+                var daemonPort: Int = 0
+
+                if (split.size == 3) {
+                    try {
+                        daemonPort = Integer.parseInt(split[2])
+                    } catch (e: NumberFormatException) {
+                        throw RuntimeException("server responded with invalid port: ${split[2]}")
+                    }
+                } else {
+                    throw RuntimeException("server responded with invalid data: $result")
+                }
+
+                return daemonPort
+
             } catch (e: IOException) {
                 throw RuntimeException("requesting server: communication failed")
             } catch (e: IllegalArgumentException) {
@@ -128,7 +144,7 @@ class ConnectionUtils() : Closeable {
         }
     }
 
-    private fun requestServer(pass: String) {
+    private fun requestServer(pass: String, daemonPort: Int) {
         if (!this::session.isInitialized || !session.isConnected) {
             throw RuntimeException("request server: session not open")
         }
@@ -144,7 +160,7 @@ class ConnectionUtils() : Closeable {
 
                 with(BufferedReader(InputStreamReader(inputStream))) {
                     with(outputStream) {
-                        write("extd:conn:$width:$height:$pass\n".toByteArray())
+                        write("extd:conn:$width:$height:$pass:$daemonPort\n".toByteArray())
                         flush()
                     }
 
@@ -167,20 +183,20 @@ class ConnectionUtils() : Closeable {
     }
 
     fun connect(ip: String, port: Int, secret: String, pass: String, name: String): Connection {
-        preConnect(ip, port, secret)
+        val daemonPort = preConnect(ip, port, secret)
         prepareSession(ip)
-        requestServer(pass)
+        requestServer(pass, daemonPort)
 
         val localHost = "127.0.0.1"
         val localPort = session.setPortForwardingL(0, localHost, 5900)
 
         Log.d("extd", "listening on $localPort")
-        return prepareConnection(ip, localPort, pass, name, secret)
+        return prepareConnection(ip, localPort, daemonPort, pass, name, secret)
     }
 
     fun connect(connection: Connection) {
         prepareSession(connection.originalIp) // tunnel to original ip
-        requestServer(connection.password)
+        requestServer(connection.password, connection.daemonPort)
 
         val localHost = "127.0.0.1"
         val localPort = session.setPortForwardingL(connection.port, localHost, 5900)
