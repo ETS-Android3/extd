@@ -12,6 +12,8 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.util.*
+import com.macasaet.fernet.Key
+import com.macasaet.fernet.Token
 
 class ConnectionUtils() : Closeable {
     private val jsch = JSch()
@@ -96,20 +98,23 @@ class ConnectionUtils() : Closeable {
         return baos.toString()
     }
 
-    private fun preConnect(ip: String, port: Int, secret: String): Int {
+    private fun preConnect(ip: String, port: Int, secret: String, key: String): Int {
         if (port <= 1024 || port > 65_535) {
             throw RuntimeException("prepare connection: invalid port: $port")
         }
 
         val address: InetAddress = InetAddress.getByName(ip)
+        val key = Key(key)
 
         with(DatagramSocket()) {
             TrafficStats.setThreadStatsTag(10000)
             soTimeout = 4000
-            val secretBytes = "$secret:${formatPublicKeyForAuthorizedKeysEntry()}".toByteArray()
+            val message = "$secret:${formatPublicKeyForAuthorizedKeysEntry()}"
+            val secretBytes = Token.generate(key, message).serialise().toByteArray()
             val buffer = ByteArray(512)
 
             try {
+                Log.d("extd", "attempting to connect to: $address, $port")
                 val request = DatagramPacket(secretBytes, secretBytes.size, address, port)
                 val response = DatagramPacket(buffer, buffer.size)
 
@@ -122,7 +127,7 @@ class ConnectionUtils() : Closeable {
                 }
 
                 val split = result.split(":")
-                var daemonPort: Int = 0
+                var daemonPort: Int
 
                 if (split.size == 3) {
                     try {
@@ -137,14 +142,14 @@ class ConnectionUtils() : Closeable {
                 return daemonPort
 
             } catch (e: IOException) {
-                throw RuntimeException("requesting server: communication failed")
+                throw RuntimeException("requesting server: communication failed (${e.message})")
             } catch (e: IllegalArgumentException) {
                 throw RuntimeException("requesting server: invalid input")
             }
         }
     }
 
-    private fun requestServer(pass: String, daemonPort: Int) {
+    private fun requestServer(pass: String, daemonPort: Int): Boolean {
         if (!this::session.isInitialized || !session.isConnected) {
             throw RuntimeException("request server: session not open")
         }
@@ -165,7 +170,7 @@ class ConnectionUtils() : Closeable {
                     }
 
                     while (output != null && !output!!.contains("extd:ok", true)) {
-                        output = readLine()
+                        output = readLine().lowercase()
                     }
                 }
 
@@ -176,19 +181,27 @@ class ConnectionUtils() : Closeable {
                 if (!connected) {
                     throw RuntimeException("request server: $output")
                 }
+
+                Log.d("extd", "request_server output: $output")
+                return output != null && output!!.contains("extd:ok:true")
             }
         } catch (e: JSchException) {
             throw RuntimeException("request server: ${e.message}")
         }
     }
 
-    fun connect(ip: String, port: Int, secret: String, pass: String, name: String): Connection {
-        val daemonPort = preConnect(ip, port, secret)
+    fun connect(ip: String, port: Int, secret: String, pass: String, key: String, name: String): Connection {
+        val daemonPort = preConnect(ip, port, secret, key)
         prepareSession(ip)
-        requestServer(pass, daemonPort)
 
-        val localHost = "127.0.0.1"
-        val localPort = session.setPortForwardingL(0, localHost, 5900)
+        val adb = requestServer(pass, daemonPort)
+        var localPort  = 5900
+
+        if (!adb) {
+            Log.d("extd", "no adb")
+            val localHost = "127.0.0.1"
+            localPort = session.setPortForwardingL(0, localHost, 5900)
+        }
 
         Log.d("extd", "listening on $localPort")
         return prepareConnection(ip, localPort, daemonPort, pass, name, secret)
@@ -196,10 +209,15 @@ class ConnectionUtils() : Closeable {
 
     fun connect(connection: Connection) {
         prepareSession(connection.originalIp) // tunnel to original ip
-        requestServer(connection.password, connection.daemonPort)
 
-        val localHost = "127.0.0.1"
-        val localPort = session.setPortForwardingL(connection.port, localHost, 5900)
+        val adb = requestServer(connection.password, connection.daemonPort)
+        var localPort  = 5900
+
+        if (!adb) {
+            Log.d("extd", "no adb")
+            val localHost = "127.0.0.1"
+            localPort = session.setPortForwardingL(0, localHost, 5900)
+        }
 
         Log.d("extd", "listening on $localPort")
     }

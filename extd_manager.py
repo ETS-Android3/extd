@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+from re import sub
 import sys
 import random
 from cryptography.fernet import Fernet
@@ -47,12 +48,13 @@ def get_ips():
     return ips
 
 
-def listen(port: int, secret: str, key: Fernet):
+def listen(port: int, secret: str, temp_key: str):
     daemon_addr = ("localhost", __DAEMON_PORT__)
+    key = key_utils.load_key()
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         try:
-            message = f'extd:listen:{port}:{secret}:{os.getlogin()}'
+            message = f'extd:listen:{port}:{secret}:{os.getlogin()}:{temp_key}'
             # encrypt the message
             message = key.encrypt(message.encode("utf-8"))
             message = base64.b64encode(message)
@@ -86,9 +88,15 @@ if len(sys.argv) < 2:
     print("not enough args")
     exit(1)
 
-key = key_utils.load_key()
-
 if sys.argv[1] == "add":
+    try:
+        subprocess.check_output(
+            ["systemctl", "is-active", "--quiet", "--user", "extd.service"])
+
+    except subprocess.CalledProcessError:
+        print("daemon not running, run extd_manager daemon start")
+        exit(1)
+
     lower, upper = get_ports()
     # port = random.randint(lower, upper)
     port = 4000
@@ -97,11 +105,20 @@ if sys.argv[1] == "add":
     ips = get_ips()
     now = datetime.datetime.now()
 
+    temp_key = key_utils.newkey().decode("utf-8")
     name = f'{socket.gethostname()}_{now.strftime("%m-%d-%Y")}'
-    data = f'extd://{",".join(ips)}:{port}:{secret}:{name}:{__DAEMON_PORT__}'
+    data = f'extd://{",".join(ips)}:{port}:{secret}:{name}:{temp_key}'
 
     subprocess.run(["qrencode", "-t", "UTF8", data])
     print(
-        f'{name}\nconnect manually: \nips: {", ".join(ips)}\nport: {port}\nsecret: {secret}\n')
+        f'{name}\nconnect manually: \nips: {", ".join(ips)}\nport: {port}\nsecret: {secret}\nkey: {temp_key}\n')
 
-    listen(port, secret, key)
+    listen(port, secret, temp_key)
+
+if sys.argv[1] == "daemon":
+    if len(sys.argv) < 3:
+        print("not enough args")
+        exit(1)
+
+    subprocess.run(
+        ["systemctl", "--user", sys.argv[2], "extd.service"])

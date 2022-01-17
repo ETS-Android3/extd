@@ -1,107 +1,369 @@
-# RSA helper class for pycrypto
-# Copyright (c) Dennis Lee
-# Date 21 Mar 2017
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
-# Description:
-# Python helper class to perform RSA encryption, decryption,
-# signing, verifying signatures & keys generation
 
-# Dependencies Packages:
-# pycrypto
+import os
+import re
+import json
+import typing
+from sh import xdg_open
+from sh import dmenu as shdmenu
+from sh import cut
+from sh import xset
+from sh import sed
+from sh import xrandr
+from sh import killall
+from sh import vim
+from sh import setxkbmap
+from sh import virsh
+from sh import ErrorReturnCode_1
+try:
+    from sh import vboxmanage
+except ImportError:
+    pass
 
-# Documentation:
-# https://www.dlitz.net/software/pycrypto/api/2.6/
 
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
-from Crypto.Signature import PKCS1_v1_5
-from Crypto.Hash import SHA512, SHA384, SHA256, SHA, MD5
-from Crypto import Random
-from base64 import b64encode, b64decode
-import rsa
+# enable users in libvirt group to use virsh without sudo
+virsh = virsh.bake(_env={'LIBVIRT_DEFAULT_URI': 'qemu:///system'})
 
-hash = "SHA-256"
+shdmenu = shdmenu.bake(
+    '-l', 30, '-fn',
+    '-*-terminus-medium-*-*-*-14-140-*-*-*-*-*-*'
+)
 
-def newkeys(keysize):
-    random_generator = Random.new().read
-    key = RSA.generate(keysize, random_generator)
-    private, public = key, key.publickey()
-    return public, private
 
-def importKey(externKey):
-    return RSA.importKey(externKey)
+def dmenu(args):
+    if isinstance(args, typing.Iterable):
+        args = '\n'.join(args)
+    return shdmenu(_in=args)
 
-def getpublickey(priv_key):
-    return priv_key.publickey()
 
-def encrypt(message, pub_key):
-    #RSA encryption protocol according to PKCS#1 OAEP
-    cipher = PKCS1_OAEP.new(pub_key)
-    return cipher.encrypt(message)
+def grep(output, pattern):
+    for line in output:
+        if pattern in line:
+            yield line
 
-def decrypt(ciphertext, priv_key):
-    #RSA encryption protocol according to PKCS#1 OAEP
-    cipher = PKCS1_OAEP.new(priv_key)
-    return cipher.decrypt(ciphertext)
 
-def sign(message, priv_key, hashAlg="SHA-256"):
-    global hash
-    hash = hashAlg
-    signer = PKCS1_v1_5.new(priv_key)
-    if (hash == "SHA-512"):
-        digest = SHA512.new()
-    elif (hash == "SHA-384"):
-        digest = SHA384.new()
-    elif (hash == "SHA-256"):
-        digest = SHA256.new()
-    elif (hash == "SHA-1"):
-        digest = SHA.new()
-    else:
-        digest = MD5.new()
-    digest.update(message)
-    return signer.sign(digest)
+def output(p):
+    return p.stdout.decode('utf-8').strip()
 
-def verify(message, signature, pub_key):
-    signer = PKCS1_v1_5.new(pub_key)
-    if (hash == "SHA-512"):
-        digest = SHA512.new()
-    elif (hash == "SHA-384"):
-        digest = SHA384.new()
-    elif (hash == "SHA-256"):
-        digest = SHA256.new()
-    elif (hash == "SHA-1"):
-        digest = SHA.new()
-    else:
-        digest = MD5.new()
-    digest.update(message)
-    return signer.verify(digest, signature)
+
+OUTPUT_ACTIVE_REX = re.compile(
+    '.* connected( primary)? (\d)+x(\d)+\+\d+\+\d+ .*')
+
+
+def cmd_xrandr_on():
+    outputs = grep(xrandr(), ' connected')
+    outputs = [o.split(' ')[0] for o in outputs
+               if not OUTPUT_ACTIVE_REX.match(o)]
+    if len(outputs) > 1:
+        outputs = output(dmenu(outputs)).split('\n')
+    if not outputs:
+        return
+    selected_output = outputs[0]
+    active_outputs = _get_active_outputs()
+    if not active_outputs:
+        return
+    choices = []
+    for active_output in active_outputs:
+        choices.append('--left-of ' + active_output)
+        choices.append('--right-of ' + active_output)
+        choices.append('--below ' + active_output)
+        choices.append('--above ' + active_output)
+        choices.append('--same-as ' + active_output)
+    choice = output(dmenu(choices))
+    option, active_output = choice.split(' ')
+    xrandr('--output', selected_output, option, active_output, '--auto')
+
+
+def _get_active_outputs():
+    outputs = grep(xrandr(), ' connected')
+    return [o.split(' ')[0] for o in outputs
+            if OUTPUT_ACTIVE_REX.match(o)]
+
+
+def cmd_xrandr_off():
+    outputs = _get_active_outputs()
+    o = output(dmenu(outputs))
+    xrandr('--output', o.split(' ')[0], '--off')
+
+
+def cmd_vbox_launch():
+    o = output(shdmenu(cut(vboxmanage('list', 'vms'), '-d"', '-f2')))
+    vboxmanage('-q', 'startvm', o, '--type', 'gui')
+
+
+def cmd_virsh_launch():
+    vms = output(virsh('list', '--all')).split('\n')
+    # virsh output:
+    #
+    #  Id    Name                           State
+    # ----------------------------------------------------
+    #  -     foobar                         shut off
+    vms = (vm.strip() for vm in vms[2:])
+    vms = (re.split(' {2,}', i) for i in vms)
+    names = [i[1] for i in vms]
+    name = output(dmenu(names))
+    virsh('start', name)
+
+
+def _change_vim_color_scheme(colorscheme, background):
+    vimrc_path = os.path.expanduser('~/.vimrc')
+
+    sed_cmd = 's/colorscheme {old_scheme}/colorscheme {new_scheme}/g'
+    sed_cmd = sed_cmd.format(old_scheme=colorscheme[0], new_scheme=colorscheme[1])
+    sed('-i', sed_cmd, vimrc_path)
+
+    sed_cmd = 's/background={old_bg}/background={new_bg}/g'
+    sed_cmd = sed_cmd.format(old_bg=background[0], new_bg=background[1])
+    sed('-i', sed_cmd, vimrc_path)
+
+    change_color = '<Esc>:set background={new_bg}<CR>:colorscheme {new_scheme}<CR>'
+    change_color = change_color.format(new_bg=background[1], new_scheme=colorscheme[1])
+    try:
+        for server in vim('--serverlist'):
+            vim('--servername', server.strip(), '--remote-send', change_color)
+    except ErrorReturnCode_1:
+        pass
+
+
+def _set_termite_config(config_name):
+    config_dir = os.path.expanduser('~/.config/termite/')
+    if not os.path.exists(os.path.join(config_dir, config_name)):
+        return
+    dst = os.path.join(config_dir, 'config')
+    if os.path.exists(dst):
+        os.remove(dst)
+    dir_fd = os.open(config_dir, flags=os.O_DIRECTORY)
+    os.symlink(config_name, 'config', dir_fd=dir_fd)
+    killall('-s', 'USR1', 'termite')
+
+
+def cmd_call():
+    filename = os.path.expanduser('~/.config/dm/contacts.json')
+    with open(filename, encoding='utf-8') as f:
+        contacts = json.load(f)
+    o = output(dmenu(contacts.keys()))
+    xdg_open(contacts[o])
+
+
+def cmd_pres_off():
+    xset('s', 'on')
+    xset('+dpms')
+    _change_vim_color_scheme(('default', 'zenburn'), ('light', 'dark'))
+    _set_termite_config('config_dark')
+
+
+def cmd_pres_on():
+    xset('s', 'off')
+    xset('-dpms')
+    _change_vim_color_scheme(('zenburn', 'default'), ('dark', 'light'))
+    _set_termite_config('config_light')
+
+
+def cmd_keyboard():
+    xset('r', 'rate', 200, 40)
+    setxkbmap(
+        '-layout', 'de',
+        '-variant', 'nodeadkeys',
+        '-option', 'caps:escape'
+    )
+
 
 def main():
-    msg1 = b"Hello Tony, I am Jarvis!"
-    msg2 = b"Hello Toni, I am Jarvis!"
+    prefix = 'cmd_'
+    g = globals()
+    commands = []
+    for k in g:
+        if k.startswith(prefix):
+            commands.append(k[len(prefix):].replace('_', ' '))
+    o = output(dmenu(commands))
+    g[prefix + o.replace(' ', '_')]()
 
-    keysize = 2048
 
-    (public, private) = rsa.newkeys(keysize)
+if __name__ == '__main__':
+    main()#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
-    # https://docs.python.org/3/library/base64.html
-    # encodes the bytes-like object s
-    # returns bytes
-    encrypted = b64encode(rsa.encrypt(msg1, private))
-    # decodes the Base64 encoded bytes-like object or ASCII string s
-    # returns the decoded bytes
-    decrypted = rsa.decrypt(b64decode(encrypted), private)
-    signature = b64encode(rsa.sign(msg1, private, "SHA-512"))
 
-    verify = rsa.verify(msg1, b64decode(signature), public)
+import os
+import re
+import json
+import typing
+from sh import xdg_open
+from sh import dmenu as shdmenu
+from sh import cut
+from sh import xset
+from sh import sed
+from sh import xrandr
+from sh import killall
+from sh import vim
+from sh import setxkbmap
+from sh import virsh
+from sh import ErrorReturnCode_1
+try:
+    from sh import vboxmanage
+except ImportError:
+    pass
 
-    #print(private.exportKey('PEM'))
-    #print(public.exportKey('PEM'))
-    print("Encrypted: " + encrypted.decode('ascii'))
-    print("Decrypted: '%s'" % (decrypted))
-    print("Signature: " + signature.decode('ascii'))
-    print("Verify: %s" % verify)
-    rsa.verify(msg2, b64decode(signature), public)
 
-if __name__== "__main__":
+# enable users in libvirt group to use virsh without sudo
+virsh = virsh.bake(_env={'LIBVIRT_DEFAULT_URI': 'qemu:///system'})
+
+shdmenu = shdmenu.bake(
+    '-l', 30, '-fn',
+    '-*-terminus-medium-*-*-*-14-140-*-*-*-*-*-*'
+)
+
+
+def dmenu(args):
+    if isinstance(args, typing.Iterable):
+        args = '\n'.join(args)
+    return shdmenu(_in=args)
+
+
+def grep(output, pattern):
+    for line in output:
+        if pattern in line:
+            yield line
+
+
+def output(p):
+    return p.stdout.decode('utf-8').strip()
+
+
+OUTPUT_ACTIVE_REX = re.compile(
+    '.* connected( primary)? (\d)+x(\d)+\+\d+\+\d+ .*')
+
+
+def cmd_xrandr_on():
+    outputs = grep(xrandr(), ' connected')
+    outputs = [o.split(' ')[0] for o in outputs
+               if not OUTPUT_ACTIVE_REX.match(o)]
+    if len(outputs) > 1:
+        outputs = output(dmenu(outputs)).split('\n')
+    if not outputs:
+        return
+    selected_output = outputs[0]
+    active_outputs = _get_active_outputs()
+    if not active_outputs:
+        return
+    choices = []
+    for active_output in active_outputs:
+        choices.append('--left-of ' + active_output)
+        choices.append('--right-of ' + active_output)
+        choices.append('--below ' + active_output)
+        choices.append('--above ' + active_output)
+        choices.append('--same-as ' + active_output)
+    choice = output(dmenu(choices))
+    option, active_output = choice.split(' ')
+    xrandr('--output', selected_output, option, active_output, '--auto')
+
+
+def _get_active_outputs():
+    outputs = grep(xrandr(), ' connected')
+    return [o.split(' ')[0] for o in outputs
+            if OUTPUT_ACTIVE_REX.match(o)]
+
+
+def cmd_xrandr_off():
+    outputs = _get_active_outputs()
+    o = output(dmenu(outputs))
+    xrandr('--output', o.split(' ')[0], '--off')
+
+
+def cmd_vbox_launch():
+    o = output(shdmenu(cut(vboxmanage('list', 'vms'), '-d"', '-f2')))
+    vboxmanage('-q', 'startvm', o, '--type', 'gui')
+
+
+def cmd_virsh_launch():
+    vms = output(virsh('list', '--all')).split('\n')
+    # virsh output:
+    #
+    #  Id    Name                           State
+    # ----------------------------------------------------
+    #  -     foobar                         shut off
+    vms = (vm.strip() for vm in vms[2:])
+    vms = (re.split(' {2,}', i) for i in vms)
+    names = [i[1] for i in vms]
+    name = output(dmenu(names))
+    virsh('start', name)
+
+
+def _change_vim_color_scheme(colorscheme, background):
+    vimrc_path = os.path.expanduser('~/.vimrc')
+
+    sed_cmd = 's/colorscheme {old_scheme}/colorscheme {new_scheme}/g'
+    sed_cmd = sed_cmd.format(old_scheme=colorscheme[0], new_scheme=colorscheme[1])
+    sed('-i', sed_cmd, vimrc_path)
+
+    sed_cmd = 's/background={old_bg}/background={new_bg}/g'
+    sed_cmd = sed_cmd.format(old_bg=background[0], new_bg=background[1])
+    sed('-i', sed_cmd, vimrc_path)
+
+    change_color = '<Esc>:set background={new_bg}<CR>:colorscheme {new_scheme}<CR>'
+    change_color = change_color.format(new_bg=background[1], new_scheme=colorscheme[1])
+    try:
+        for server in vim('--serverlist'):
+            vim('--servername', server.strip(), '--remote-send', change_color)
+    except ErrorReturnCode_1:
+        pass
+
+
+def _set_termite_config(config_name):
+    config_dir = os.path.expanduser('~/.config/termite/')
+    if not os.path.exists(os.path.join(config_dir, config_name)):
+        return
+    dst = os.path.join(config_dir, 'config')
+    if os.path.exists(dst):
+        os.remove(dst)
+    dir_fd = os.open(config_dir, flags=os.O_DIRECTORY)
+    os.symlink(config_name, 'config', dir_fd=dir_fd)
+    killall('-s', 'USR1', 'termite')
+
+
+def cmd_call():
+    filename = os.path.expanduser('~/.config/dm/contacts.json')
+    with open(filename, encoding='utf-8') as f:
+        contacts = json.load(f)
+    o = output(dmenu(contacts.keys()))
+    xdg_open(contacts[o])
+
+
+def cmd_pres_off():
+    xset('s', 'on')
+    xset('+dpms')
+    _change_vim_color_scheme(('default', 'zenburn'), ('light', 'dark'))
+    _set_termite_config('config_dark')
+
+
+def cmd_pres_on():
+    xset('s', 'off')
+    xset('-dpms')
+    _change_vim_color_scheme(('zenburn', 'default'), ('dark', 'light'))
+    _set_termite_config('config_light')
+
+
+def cmd_keyboard():
+    xset('r', 'rate', 200, 40)
+    setxkbmap(
+        '-layout', 'de',
+        '-variant', 'nodeadkeys',
+        '-option', 'caps:escape'
+    )
+
+
+def main():
+    prefix = 'cmd_'
+    g = globals()
+    commands = []
+    for k in g:
+        if k.startswith(prefix):
+            commands.append(k[len(prefix):].replace('_', ' '))
+    o = output(dmenu(commands))
+    g[prefix + o.replace(' ', '_')]()
+
+
+if __name__ == '__main__':
     main()

@@ -25,6 +25,7 @@ class PageFragmentNewConnection : Fragment() {
     private lateinit var txName: EditText
     private lateinit var txPort: EditText
     private lateinit var txSecret: EditText
+    private lateinit var txKey: EditText
     private lateinit var btConnect: Button
     private lateinit var fabQrConnect: FloatingActionButton
     private val receiver = FragmentReceiver()
@@ -39,6 +40,7 @@ class PageFragmentNewConnection : Fragment() {
         txIp = view.findViewById(R.id.txIp)
         txPort = view.findViewById(R.id.txPort)
         txSecret = view.findViewById(R.id.txSecret)
+        txKey = view.findViewById(R.id.txKey)
         btConnect = view.findViewById(R.id.btConnect)
         fabQrConnect = view.findViewById(R.id.fabQrConnect)
 
@@ -65,8 +67,9 @@ class PageFragmentNewConnection : Fragment() {
                 val ip = txIp.text.toString()
                 val port = Integer.parseInt(txPort.text.toString())
                 val secret = txSecret.text.toString()
+                val key = txKey.text.toString()
 
-                (activity as MainActivity).connect(ip, port, secret, name)
+                (activity as MainActivity).connect(ip, port, secret, key, name)
             } catch (e: Exception) {
             }
         }
@@ -78,6 +81,9 @@ class PageFragmentNewConnection : Fragment() {
             btConnect.isEnabled = isValid()
         }
         txSecret.addTextChangedListener {
+            btConnect.isEnabled = isValid()
+        }
+        txKey.addTextChangedListener {
             btConnect.isEnabled = isValid()
         }
 
@@ -105,6 +111,7 @@ class PageFragmentNewConnection : Fragment() {
             val ip = txIp.text.toString()
             val port = Integer.parseInt(txPort.text.toString())
             val secret = txSecret.text.toString()
+            val key = txKey.text.toString()
 
             val split = ip.split(".")
 
@@ -116,7 +123,7 @@ class PageFragmentNewConnection : Fragment() {
                 }
             }
 
-            if (ip != "" && split.size == 4 && port > 0 && secret != "") return true
+            if (ip != "" && split.size == 4 && port > 0 && secret != "" && key != "") return true
         } catch (e: Exception) {
         }
 

@@ -147,13 +147,13 @@ class MainActivity : AppCompatActivity() {
         return password
     }
 
-    fun connect(ip: String, port: Int, secret: String, name: String = "") {
+    fun connect(ip: String, port: Int, secret: String, key: String, name: String = "") {
         Toast.makeText(this, "Attempting to connect to $ip:$port ($secret)", Toast.LENGTH_SHORT)
             .show()
 
         scope.launch {
             try {
-                val conn = connectionUtils.connect(ip, port, secret, randomPass(12), name)
+                val conn = connectionUtils.connect(ip, port, secret, randomPass(12), key, name)
                 val next = ArrayList<ConnectionListItem>()
                 var old: List<ConnectionListItem>? = null
 
@@ -326,6 +326,7 @@ class MainActivity : AppCompatActivity() {
             val ips = args[0].split(",")
             val secret = args[2]
             val name = args[3]
+            val key = args[4]
             var port = 0
 
             try {
@@ -333,7 +334,7 @@ class MainActivity : AppCompatActivity() {
             } catch (e: NumberFormatException) {
             }
 
-            if (secret.trim().isEmpty() || port == 0) {
+            if (secret.trim().isEmpty() || port == 0 || key.trim().isEmpty()) {
                 Toast.makeText(this, "Invalid connection string", Toast.LENGTH_SHORT).show()
 
                 return
@@ -342,7 +343,7 @@ class MainActivity : AppCompatActivity() {
             val alertDialogBuilder = AlertDialog.Builder(this)
             alertDialogBuilder.setTitle("Choose ip")
             alertDialogBuilder.setItems(ips.toTypedArray()) { _: DialogInterface, i: Int ->
-                connect(ips[i], port, secret, name)
+                connect(ips[i], port, secret, key, name)
             }
             val alertDialog = alertDialogBuilder.create()
             alertDialog.show()

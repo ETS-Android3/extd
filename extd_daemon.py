@@ -4,6 +4,7 @@ import subprocess
 from typing import Callable
 import base64
 import key_utils
+from cryptography.fernet import Fernet
 
 logging.basicConfig(filename="extd.log", level=logging.INFO)
 
@@ -30,6 +31,15 @@ def spawn(width: str, height: str, password: str, then: Callable[[str], str]):
 
         try:
             # -once -timeout 30 -localhost -o /usr/share/extd/log.log -threads -passwd "${split[3]}" -clip "${split[1]}x${split[2]}+0+0"
+            adb_on = False
+            try:
+                subprocess.call(
+                    ["adb", "reverse", "tcp:5900", "tcp:5900"])
+                adb_on = True
+            except subprocess.CalledProcessError:
+                logging.info("adb device not available")
+
+            # adb reverse --remove tcp:5900
             result = subprocess.check_call(
                 [
                     "/usr/bin/x11vnc",
@@ -48,9 +58,9 @@ def spawn(width: str, height: str, password: str, then: Callable[[str], str]):
                     "extd.log",
                     "-bg"
                 ])
-            then("extd:ok")
+            then(f'extd:ok:{adb_on}')
 
-            return f'extd:spawn_status:{result}'
+            return f'extd:spawn_status:{result}:{adb_on}'
 
         except subprocess.CalledProcessError as e:
             print(f'extd:ssh_wait:spawn_error:{e.returncode}')
@@ -67,7 +77,9 @@ def spawn(width: str, height: str, password: str, then: Callable[[str], str]):
         return f'extd:ssh_wait:unknown_error:{str(e)}'
 
 
-def listen(port: int, secret: str, user: str):
+def listen(port: int, secret: str, user: str, temp_key: str):
+    temp_decryption_key = Fernet(temp_key.encode("utf-8"))
+
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.bind(("", port))
         logging.info(f'extd:daemon:listen listening for client on port {port}')
@@ -75,7 +87,9 @@ def listen(port: int, secret: str, user: str):
         try:
             # listens for the initial request from the device that wants to be added
             data, address = s.recvfrom(512)
+            data = temp_decryption_key.decrypt(data)
             data = data.decode("utf-8")
+
             received_secret, key = data.split(":")
             logging.info(
                 f'extd:daemon:listen got request from {address[0]}:{str(address[1])}')
@@ -125,7 +139,7 @@ def listen(port: int, secret: str, user: str):
             return "extd:daemon:listen:cancelled"
 
         except Exception as e:
-            return "extd:daemon:listen:unknown_error"
+            return f'extd:daemon:listen:unknown_error:{str(e)}'
 
 
 private_key = key_utils.load_key()
@@ -146,12 +160,13 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             logging.info("extd:daemon got request from " +
                          address[0] + ":" + str(address[1]))
 
-            if len(request) == 5 and request[0] == "extd" and request[1] == "listen":
+            if len(request) == 6 and request[0] == "extd" and request[1] == "listen":
                 port = int(request[2])
                 secret = request[3]
                 user = request[4]
+                temp_key = request[5]
 
-                result = listen(port, secret, user)
+                result = listen(port, secret, user, temp_key)
                 logging.info(result)
                 print(result)
 

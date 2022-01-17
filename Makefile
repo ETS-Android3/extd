@@ -21,6 +21,8 @@ install:
 	sudo -u $(USER) ssh-keygen -t rsa -b 4096 -f $(USER_KEY_FOLDER)/extd -N "" 0>&-
 	sudo -u $(USER) python3 gen_key.py $(USER_KEY_FOLDER)/extd.key
 
+	chmod 600 $(USER_KEY_FOLDER)/extd.key
+
 	# copy the key to extd, so extd user will be able to decrypt and encrypt
 	cp $(USER_KEY_FOLDER)/extd.key $(EXTD_USER_HOME)/.ssh/extd.key
 
