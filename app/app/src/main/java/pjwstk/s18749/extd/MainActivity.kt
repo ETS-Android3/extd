@@ -175,11 +175,12 @@ class MainActivity : AppCompatActivity() {
 
             } catch (e: RuntimeException) {
                 runOnUiThread {
-                    Toast.makeText(
-                        this@MainActivity,
-                        e.message,
-                        Toast.LENGTH_LONG
-                    ).show()
+                    // Use the Builder class for convenient dialog construction
+                    val builder = android.app.AlertDialog.Builder(this@MainActivity)
+                    builder.setMessage("Connection failed. Reason: ${e.message}")
+                    // Create the AlertDialog object and return it
+                    val dialog = builder.create()
+                    dialog.show()
                 }
             }
         }
@@ -196,11 +197,12 @@ class MainActivity : AppCompatActivity() {
 
             } catch (e: RuntimeException) {
                 runOnUiThread {
-                    Toast.makeText(
-                        this@MainActivity,
-                        e.message,
-                        Toast.LENGTH_LONG
-                    ).show()
+                    // Use the Builder class for convenient dialog construction
+                    val builder = android.app.AlertDialog.Builder(this@MainActivity)
+                    builder.setMessage("Connection failed reason: ${e.message}")
+                    // Create the AlertDialog object and return it
+                    val dialog = builder.create()
+                    dialog.show()
                 }
             }
         }

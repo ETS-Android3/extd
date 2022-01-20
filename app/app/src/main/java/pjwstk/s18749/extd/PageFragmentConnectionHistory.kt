@@ -1,5 +1,7 @@
 package pjwstk.s18749.extd
 
+import android.app.AlertDialog
+import android.content.DialogInterface
 import android.os.Bundle
 import android.transition.TransitionManager
 import android.view.LayoutInflater
@@ -138,10 +140,25 @@ class PageFragmentConnectionHistory : Fragment() {
         val next = history
 
         if (next != null && next.size > position) {
-            var i = 0
+            activity?.let {
+                // Use the Builder class for convenient dialog construction
+                val builder = AlertDialog.Builder(it)
+                builder.setMessage("Are you sure you want to delete this connection?")
+                    .setPositiveButton("Yes",
+                        DialogInterface.OnClickListener { dialog, id ->
+                            var i = 0
 
-            history = next.filter { _ -> i++ != position }
-            saveList(history!!)
+                            history = next.filter { _ -> i++ != position }
+                            saveList(history!!)
+                        })
+                    .setNegativeButton("Cancel",
+                        DialogInterface.OnClickListener { dialog, id ->
+                            // User cancelled the dialog
+                        })
+                // Create the AlertDialog object and return it
+                val dialog = builder.create()
+                dialog.show()
+            }
         }
     }
 
