@@ -24,8 +24,11 @@ import pjwstk.s18749.extd.multivnc.ConnectionBean
 import pjwstk.s18749.extd.multivnc.Constants
 import pjwstk.s18749.extd.multivnc.VncCanvasActivity
 import java.io.File
+import java.net.InetAddress
+import java.net.NetworkInterface
 import java.util.*
 import kotlin.collections.ArrayList
+import kotlin.experimental.and
 
 
 class MainActivity : AppCompatActivity() {
@@ -147,6 +150,27 @@ class MainActivity : AppCompatActivity() {
         return password
     }
 
+    fun saveInHistory(conn: Connection) {
+        val next = ArrayList<Connection>()
+        var old: List<Connection>? = null
+
+        try {
+            old = store.read()
+        } catch (e: RuntimeException) {
+        }
+
+        conn.lastConnected = Date()
+
+        if (old != null) {
+            next.addAll(old)
+        }
+
+        next.add(conn)
+
+        store.save(next.toList())
+        onConnectionReady(conn)
+    }
+
     fun connect(ip: String, port: Int, secret: String, key: String, name: String = "") {
         Toast.makeText(this, "Attempting to connect to $ip:$port ($secret)", Toast.LENGTH_SHORT)
             .show()
@@ -154,24 +178,7 @@ class MainActivity : AppCompatActivity() {
         scope.launch {
             try {
                 val conn = connectionUtils.connect(ip, port, secret, randomPass(12), key, name)
-                val next = ArrayList<ConnectionListItem>()
-                var old: List<ConnectionListItem>? = null
-
-                try {
-                    old = store.read()
-                } catch (e: RuntimeException) {
-                }
-
-                conn.lastConnected = Date()
-
-                if (old != null) {
-                    next.addAll(old)
-                }
-
-                next.add(ConnectionListItem(false, conn))
-
-                store.save(next.toList())
-                onConnectionReady(conn)
+                saveInHistory(conn)
 
             } catch (e: RuntimeException) {
                 runOnUiThread {
@@ -186,25 +193,66 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    fun processConnection(conn: Connection) {
+        try {
+            saveInHistory(conn)
+            onConnectionReady(conn)
+
+        } catch (e: RuntimeException) {
+            runOnUiThread {
+                // Use the Builder class for convenient dialog construction
+                val builder = android.app.AlertDialog.Builder(this@MainActivity)
+                builder.setMessage("Connection failed reason: ${e.message}")
+                // Create the AlertDialog object and return it
+                val dialog = builder.create()
+                dialog.show()
+            }
+        }
+    }
+
     fun connect(conn: Connection) {
-        Toast.makeText(this, "Attempting to connect to ${conn.ip}:${conn.port} (${conn.secret})", Toast.LENGTH_SHORT)
-            .show()
+        Toast.makeText(
+            this,
+            "Attempting to connect to ${conn.ip}:${conn.port} (${conn.secret})",
+            Toast.LENGTH_SHORT
+        ).show()
+
+        val ipAddresses = getIPAddresses()
+
+        if (ipAddresses.isEmpty()) {
+            val builder = android.app.AlertDialog.Builder(this)
+            builder.setMessage("No networks detected.\nIf you intend to connect using USB Tethering, turn off cellular data as it disallows the app to read your tether ip.")
+            val dialog = builder.create()
+            dialog.show()
+            return
+        }
+
+        var ok = false
+
+        for (subnet in ipAddresses) {
+            if (sameNetwork(conn.originalIp, subnet)) {
+                ok = true
+                break
+            }
+        }
+
+        if (!ok) {
+            val builder = android.app.AlertDialog.Builder(this)
+            builder.setMessage(
+                "This server does not seem to be in the common network with this device.\nYour ip's:${
+                    ipAddresses.joinToString(
+                        ","
+                    )
+                }\nTarget ip: ${conn.originalIp}"
+            )
+            val dialog = builder.create()
+            dialog.show()
+            return
+        }
 
         scope.launch {
-            try {
-                connectionUtils.connect(conn)
-                onConnectionReady(conn)
-
-            } catch (e: RuntimeException) {
-                runOnUiThread {
-                    // Use the Builder class for convenient dialog construction
-                    val builder = android.app.AlertDialog.Builder(this@MainActivity)
-                    builder.setMessage("Connection failed reason: ${e.message}")
-                    // Create the AlertDialog object and return it
-                    val dialog = builder.create()
-                    dialog.show()
-                }
-            }
+            val cp = connectionUtils.connect(conn)
+            processConnection(cp)
         }
     }
 
@@ -312,7 +360,7 @@ class MainActivity : AppCompatActivity() {
 
         if (requestCode == CAMERA_CODE) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, "camera permission granted", Toast.LENGTH_SHORT).show()
+//                Toast.makeText(this, "camera permission granted", Toast.LENGTH_SHORT).show()
 
                 cameraTask()
             } else {
@@ -321,11 +369,87 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    fun sameNetwork(ip: String, subnet: String): Boolean {
+        val split = subnet.split("/")
+        if (split.size != 2) return false
+
+        val ip = InetAddress.getByName(ip).address
+        val subnet = InetAddress.getByName(split[0]).address
+
+        val ipInt = ip[0].toInt() and 0xFF shl 24 or
+                (ip[1].toInt() and 0xFF shl 16) or
+                (ip[2].toInt() and 0xFF shl 8) or
+                (ip[3].toInt() and 0xFF shl 0)
+        val subnetInt = subnet[0].toInt() and 0xFF shl 24 or
+                (subnet[1].toInt() and 0xFF shl 16) or
+                (subnet[2].toInt() and 0xFF shl 8) or
+                (subnet[3].toInt() and 0xFF shl 0)
+
+        var bits: Int
+
+        try {
+            bits = Integer.parseInt(split[1])
+        } catch (e: NumberFormatException) {
+            return false
+        }
+
+        val mask = -1 shl (32 - bits)
+
+        return (subnetInt and mask) == (ipInt and mask)
+    }
+
+    private fun getIPAddresses(): List<String> {
+        var list: ArrayList<String> = ArrayList()
+
+        try {
+            val interfaces: List<NetworkInterface> =
+                Collections.list(NetworkInterface.getNetworkInterfaces())
+            for (intf in interfaces) {
+                val mask = intf.interfaceAddresses[1].networkPrefixLength
+                val addrs: List<InetAddress> = Collections.list(intf.inetAddresses)
+
+                if (intf.isUp) {
+                    for (addr in addrs) {
+                        if (!addr.isLoopbackAddress) {
+                            val sAddr: String = addr.hostAddress
+//                        val isIPv4 = InetAddressUtils.isIPv4Address(sAddr);
+                            val isIPv4 = sAddr.indexOf(':') < 0
+
+                            if (isIPv4) list.add("$sAddr/$mask")
+                        }
+                    }
+                }
+            }
+        } catch (ignored: Exception) {
+        }
+
+        return list
+    }
+
     private fun connectFromString(connectionString: String) {
         val args = connectionString.replace("extd://", "").split(":")
+        val ipAddresses = getIPAddresses()
+
+        if (ipAddresses.isEmpty()) {
+            val builder = android.app.AlertDialog.Builder(this)
+            builder.setMessage("No networks detected.\nIf you intend to connect using USB Tethering, turn off cellular data as it disallows the app to read your tether ip.")
+            val dialog = builder.create()
+            dialog.show()
+            return
+        }
 
         if (args.size == 5) {
-            val ips = args[0].split(",")
+            var ips = args[0].split(",")
+                .filter { ip -> ipAddresses.any { internal -> sameNetwork(ip, internal) } }
+
+            if (ips.isEmpty()) {
+                val builder = android.app.AlertDialog.Builder(this)
+                builder.setMessage("This server does not seem to be in the common network with this device.\nYour ip's:${ipAddresses.joinToString(",")}\nTarget ip's: ${args[0]}")
+                val dialog = builder.create()
+                dialog.show()
+                return
+            }
+
             val secret = args[2]
             val name = args[3]
             val key = args[4]
@@ -337,18 +461,25 @@ class MainActivity : AppCompatActivity() {
             }
 
             if (secret.trim().isEmpty() || port == 0 || key.trim().isEmpty()) {
-                Toast.makeText(this, "Invalid connection string", Toast.LENGTH_SHORT).show()
+                val builder = android.app.AlertDialog.Builder(this)
+                builder.setMessage("Invalid connection string.\nValid connection string needs to be in a form: \"extd://ip0[,ip1,...]:port:secret:name:temp_key\".")
+                val dialog = builder.create()
+                dialog.show()
 
                 return
             }
 
-            val alertDialogBuilder = AlertDialog.Builder(this)
-            alertDialogBuilder.setTitle("Choose ip")
-            alertDialogBuilder.setItems(ips.toTypedArray()) { _: DialogInterface, i: Int ->
-                connect(ips[i], port, secret, key, name)
+            if (ips.size > 1) {
+                val alertDialogBuilder = AlertDialog.Builder(this)
+                alertDialogBuilder.setTitle("Choose ip")
+                alertDialogBuilder.setItems(ips.toTypedArray()) { _: DialogInterface, i: Int ->
+                    connect(ips[i], port, secret, key, name)
+                }
+                val alertDialog = alertDialogBuilder.create()
+                alertDialog.show()
+            } else {
+                connect(ips[0], port, secret, key, name)
             }
-            val alertDialog = alertDialogBuilder.create()
-            alertDialog.show()
         }
     }
 }

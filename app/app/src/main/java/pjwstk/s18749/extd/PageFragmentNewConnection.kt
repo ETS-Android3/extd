@@ -108,10 +108,11 @@ class PageFragmentNewConnection : Fragment() {
         if (!(requireActivity() as MainActivity).keysReady()) return false
 
         try {
-            val ip = txIp.text.toString()
-            val port = Integer.parseInt(txPort.text.toString())
-            val secret = txSecret.text.toString()
-            val key = txKey.text.toString()
+            val ip = txIp.text.toString().trim()
+            val name = txName.text.toString().trim()
+            val port = Integer.parseInt(txPort.text.toString().trim())
+            val secret = txSecret.text.toString().trim()
+            val key = txKey.text.toString().trim()
 
             val split = ip.split(".")
 
@@ -123,7 +124,7 @@ class PageFragmentNewConnection : Fragment() {
                 }
             }
 
-            if (ip != "" && split.size == 4 && port > 0 && secret != "" && key != "") return true
+            if (name != "" && ip != "" && split.size == 4 && port > 0 && secret != "" && key != "") return true
         } catch (e: Exception) {
         }
 

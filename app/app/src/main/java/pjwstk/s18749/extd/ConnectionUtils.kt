@@ -1,19 +1,20 @@
 package pjwstk.s18749.extd
 
 import android.content.res.Resources
-import android.net.TrafficStats
 import android.util.Log
 import com.jcraft.jsch.JSch
 import com.jcraft.jsch.JSchException
 import com.jcraft.jsch.KeyPair
 import com.jcraft.jsch.Session
-import java.io.*
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.InetAddress
-import java.util.*
 import com.macasaet.fernet.Key
 import com.macasaet.fernet.Token
+import java.io.*
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.net.SocketTimeoutException
+import java.util.*
+
 
 class ConnectionUtils() : Closeable {
     private val jsch = JSch()
@@ -67,14 +68,21 @@ class ConnectionUtils() : Closeable {
             throw RuntimeException("prepare connection: invalid port: $port")
         }
 
-        val conn = Connection(name, "127.0.0.1", host, port, daemonPort, secret, pass, Date())
-
-//        conn.userName = "extd"
+        //        conn.userName = "extd"
 //        conn.useLocalCursor = true // always enable
 //        conn.colorModel = COLORMODEL.C24bit.nameString()
 //        conn.useRepeater = false
 
-        return conn
+        return Connection(
+            name,
+            "127.0.0.1",
+            host,
+            port,
+            daemonPort,
+            secret,
+            pass,
+            Date()
+        )
     }
 
     private fun prepareSession(ip: String) {
@@ -84,7 +92,7 @@ class ConnectionUtils() : Closeable {
             session = jsch.getSession("extd", ip, 22)
             // session.setConfig("PreferredAuthentications", "publickey");
             session.setConfig("StrictHostKeyChecking", "no")
-            session.timeout = 10_000
+            session.timeout = 2_000
             session.connect()
 
         } catch (e: JSchException) {
@@ -98,63 +106,90 @@ class ConnectionUtils() : Closeable {
         return baos.toString()
     }
 
+    private fun communicate(ip: String, port: Int, data: ByteArray): String {
+        val address: InetAddress = InetAddress.getByName(ip)
+        Log.d("extd", "attempting to connect to: $address, $port")
+        val client = Socket()
+
+        try {
+            client.connect(InetSocketAddress(address, port), 2_000)
+        } catch (e: SocketTimeoutException) {
+            throw RuntimeException("Connection timed out.\nAre you sure you are on the same network with the desktop?\n\nHint: you can connect to pc using USB cable, then turn on USB Tethering and try again")
+        }
+
+        var result = ""
+
+        with(BufferedReader(InputStreamReader(client.inputStream))) {
+            Log.d("extd", "connected: $address, $port")
+            with(client.outputStream) {
+                write(data)
+                flush()
+            }
+
+            while (result != null && !result!!.contains("extd:ok", true)) {
+                Log.d("extd", "part: $result")
+                result = readLine().lowercase()
+            }
+
+            return result
+        }
+    }
+
     private fun preConnect(ip: String, port: Int, secret: String, key: String): Int {
         if (port <= 1024 || port > 65_535) {
             throw RuntimeException("prepare connection: invalid port: $port")
         }
 
-        val address: InetAddress = InetAddress.getByName(ip)
         val key = Key(key)
 
-        with(DatagramSocket()) {
-            TrafficStats.setThreadStatsTag(10000)
-            soTimeout = 4000
-            val message = "$secret:${formatPublicKeyForAuthorizedKeysEntry()}"
-            val secretBytes = Token.generate(key, message).serialise().toByteArray()
-            val buffer = ByteArray(512)
+        val message = "$secret:${
+            Base64.getEncoder()
+                .encodeToString(formatPublicKeyForAuthorizedKeysEntry().toByteArray())
+        }"
+        val secretBytes = Token.generate(key, message).serialise().toByteArray()
 
-            try {
-                Log.d("extd", "attempting to connect to: $address, $port")
-                val request = DatagramPacket(secretBytes, secretBytes.size, address, port)
-                val response = DatagramPacket(buffer, buffer.size)
+        try {
 
-                send(request)
-                receive(response)
-                val result = String(response.data, 0, response.length)
-
-                if (!result.contains("extd:ok")) {
-                    throw RuntimeException("requesting server: $result")
-                }
-
-                val split = result.split(":")
-                var daemonPort: Int
-
-                if (split.size == 3) {
-                    try {
-                        daemonPort = Integer.parseInt(split[2])
-                    } catch (e: NumberFormatException) {
-                        throw RuntimeException("server responded with invalid port: ${split[2]}")
-                    }
-                } else {
-                    throw RuntimeException("server responded with invalid data: $result")
-                }
-
-                return daemonPort
-
-            } catch (e: IOException) {
-                throw RuntimeException("requesting server: communication failed (${e.message})")
-            } catch (e: IllegalArgumentException) {
-                throw RuntimeException("requesting server: invalid input")
+            var result: String = try {
+                communicate("", port, secretBytes)
+            } catch (e: Exception) {
+                communicate(ip, port, secretBytes)
             }
+
+            Log.d("extd", "result $result")
+            if (!result.contains("extd:ok")) {
+                throw RuntimeException("requesting server: $result")
+            }
+
+            val split = result.trim().split(":")
+            var daemonPort: Int
+
+            if (split.size == 3) {
+                try {
+                    daemonPort = Integer.parseInt(split[2])
+                } catch (e: NumberFormatException) {
+                    throw RuntimeException("server responded with invalid port: ${split[2]}")
+                }
+            } else {
+                throw RuntimeException("server responded with invalid data: $result")
+            }
+
+            return daemonPort
+
+        } catch (e: IOException) {
+            throw RuntimeException("requesting server: communication failed (${e.message})")
+        } catch (e: IllegalArgumentException) {
+            throw RuntimeException("requesting server: invalid input")
         }
     }
 
-    private fun requestServer(pass: String, daemonPort: Int): Boolean {
+    private fun requestServer(pass: String, daemonPort: Int): List<Int> {
         if (!this::session.isInitialized || !session.isConnected) {
             throw RuntimeException("request server: session not open")
         }
 
         try {
+            session.timeout = 2_000
             with(session.openChannel("shell")) {
                 val displayMetrics = Resources.getSystem().displayMetrics
                 val height = displayMetrics.heightPixels
@@ -165,61 +200,92 @@ class ConnectionUtils() : Closeable {
 
                 with(BufferedReader(InputStreamReader(inputStream))) {
                     with(outputStream) {
-                        write("extd:conn:$width:$height:$pass:$daemonPort\n".toByteArray())
+                        write("extd:conn:$width:$height:$pass:$daemonPort:false\n".toByteArray())
                         flush()
                     }
 
                     while (output != null && !output!!.contains("extd:ok", true)) {
-                        output = readLine().lowercase()
+                        output = readLine()?.lowercase()
                     }
                 }
 
                 disconnect()
+                if (output == null) {
+                    throw RuntimeException("request server: did not get response")
+                }
 
-                val connected = output != null && output!!.contains("extd:ok")
-
-                if (!connected) {
+                val split = output!!.split(":")
+                if (split.size != 4 || split[1] != "ok") {
                     throw RuntimeException("request server: $output")
                 }
 
-                Log.d("extd", "request_server output: $output")
-                return output != null && output!!.contains("extd:ok:true")
+                var port: Int
+                var adbOn = 0
+
+                if (split[2] == "true") {
+                    adbOn = 1
+                }
+
+                try {
+                    port = Integer.parseInt(split[3])
+                } catch (e: NumberFormatException) {
+                    throw RuntimeException("request server: invalid port: ${split[3]}")
+                }
+
+                return listOf(adbOn, port)
             }
         } catch (e: JSchException) {
             throw RuntimeException("request server: ${e.message}")
         }
     }
 
-    fun connect(ip: String, port: Int, secret: String, pass: String, key: String, name: String): Connection {
+    fun connect(
+        ip: String,
+        port: Int,
+        secret: String,
+        pass: String,
+        key: String,
+        name: String
+    ): Connection {
         val daemonPort = preConnect(ip, port, secret, key)
         prepareSession(ip)
 
-        val adb = requestServer(pass, daemonPort)
-        var localPort  = 5900
+        val response = requestServer(pass, daemonPort)
+        val adbOn = response[0] == 1
+        var port = response[1]
 
-        if (!adb) {
+        if (!adbOn) {
             Log.d("extd", "no adb")
             val localHost = "127.0.0.1"
-            localPort = session.setPortForwardingL(0, localHost, 5900)
+            port = session.setPortForwardingL(0, localHost, port)
         }
 
-        Log.d("extd", "listening on $localPort")
-        return prepareConnection(ip, localPort, daemonPort, pass, name, secret)
+        Log.d("extd", "listening on $port")
+        return prepareConnection(ip, port, daemonPort, pass, name, secret)
     }
 
-    fun connect(connection: Connection) {
+    fun connect(connection: Connection): Connection {
         prepareSession(connection.originalIp) // tunnel to original ip
 
-        val adb = requestServer(connection.password, connection.daemonPort)
-        var localPort  = 5900
+        val response = requestServer(connection.password, connection.daemonPort)
+        val adbOn = response[0] == 1
+        var port = response[1]
 
-        if (!adb) {
+        if (!adbOn) {
             Log.d("extd", "no adb")
             val localHost = "127.0.0.1"
-            localPort = session.setPortForwardingL(0, localHost, 5900)
+            port = session.setPortForwardingL(0, localHost, port)
         }
 
-        Log.d("extd", "listening on $localPort")
+        Log.d("extd", "listening on $port")
+        return prepareConnection(
+            connection.ip,
+            port,
+            connection.daemonPort,
+            connection.password,
+            connection.name,
+            connection.secret
+        )
     }
 
     override fun close() {

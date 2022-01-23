@@ -3,11 +3,11 @@ package pjwstk.s18749.extd
 import androidx.recyclerview.widget.DiffUtil
 
 class ConnectionListDiffUtilCallback(
-    private val oldList:List<ConnectionListItem>,
-    private val newList:List<ConnectionListItem>
+    private val oldList:List<Connection>,
+    private val newList:List<Connection>
 ) : DiffUtil.Callback() {
     override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-        return oldList[oldItemPosition].connection.id == newList[newItemPosition].connection.id
+        return oldList[oldItemPosition].id == newList[newItemPosition].id
     }
 
     override fun getOldListSize(): Int {

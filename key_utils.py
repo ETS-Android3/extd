@@ -1,7 +1,5 @@
 from cryptography.fernet import Fernet
 
-hash = "SHA-256"
-
 
 def newkey():
     return Fernet.generate_key()

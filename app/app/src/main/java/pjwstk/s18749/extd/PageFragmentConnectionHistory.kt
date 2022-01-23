@@ -3,7 +3,6 @@ package pjwstk.s18749.extd
 import android.app.AlertDialog
 import android.content.DialogInterface
 import android.os.Bundle
-import android.transition.TransitionManager
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -18,9 +17,9 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import kotlinx.coroutines.*
 
 class PageFragmentConnectionHistory : Fragment() {
-    private var history: List<ConnectionListItem>? = null
+    private var history: List<Connection>? = null
     private val historyConnectionsAdapter =
-        ConnectionListAdapter(::onListItemClick, ::onListItemRemove, ::onListItemConnect)
+        ConnectionListAdapter(::onListItemRemove, ::onListItemConnect)
 
     private lateinit var rv: RecyclerView
     private lateinit var emptyMsg: LinearLayout
@@ -37,12 +36,11 @@ class PageFragmentConnectionHistory : Fragment() {
     }
 
     fun updateViews() {
+        sort()
         val next = history
 
         if (next != null) {
             historyConnectionsAdapter.update(next.toList())
-
-//            TransitionManager.beginDelayedTransition(rv)
 
             if (next.isEmpty()) {
                 rv.visibility = View.GONE
@@ -54,6 +52,19 @@ class PageFragmentConnectionHistory : Fragment() {
         } else {
             rv.visibility = View.GONE
             emptyMsg.visibility = View.VISIBLE
+        }
+    }
+
+
+    private fun sort() {
+        if (history != null) {
+            history = history!!.sortedWith { first: Connection, second: Connection ->
+                if (second.lastConnected != null && first.lastConnected != null) {
+                    second.lastConnected!!.compareTo(first.lastConnected)
+                } else {
+                    second.createdAt.compareTo(first.createdAt)
+                }
+            }
         }
     }
 
@@ -92,6 +103,7 @@ class PageFragmentConnectionHistory : Fragment() {
         scope.launch {
             try {
                 history = (requireActivity() as MainActivity).store().read()
+                sort()
             } catch (e: RuntimeException) {
                 requireActivity().runOnUiThread {
                     Toast.makeText(
@@ -110,29 +122,14 @@ class PageFragmentConnectionHistory : Fragment() {
         }
     }
 
-    private fun saveList(list: List<ConnectionListItem>) {
+    private fun saveList(list: List<Connection>) {
         scope.launch {
+            sort()
             (requireActivity() as MainActivity).store().save(list)
 
             requireActivity().runOnUiThread {
                 updateViews()
             }
-        }
-    }
-
-    private fun onListItemClick(position: Int) {
-        val next = history
-
-        if (next != null && next.size > position) {
-            var i = 0
-            history = next.map { old ->
-                when (i++ == position) {
-                    true -> ConnectionListItem(!old.isOpen, old.connection)
-                    else -> old
-                }
-            }
-
-            saveList(history!!)
         }
     }
 
@@ -143,16 +140,22 @@ class PageFragmentConnectionHistory : Fragment() {
             activity?.let {
                 // Use the Builder class for convenient dialog construction
                 val builder = AlertDialog.Builder(it)
-                builder.setMessage("Are you sure you want to delete this connection?")
+                builder.setMessage("Are you sure you want to delete ${next[position].name}?")
                     .setPositiveButton("Yes",
-                        DialogInterface.OnClickListener { dialog, id ->
+                        DialogInterface.OnClickListener { _, _ ->
                             var i = 0
 
                             history = next.filter { _ -> i++ != position }
                             saveList(history!!)
+
+                            Toast.makeText(
+                                requireActivity(),
+                                "done",
+                                Toast.LENGTH_LONG
+                            ).show()
                         })
                     .setNegativeButton("Cancel",
-                        DialogInterface.OnClickListener { dialog, id ->
+                        DialogInterface.OnClickListener { _, _ ->
                             // User cancelled the dialog
                         })
                 // Create the AlertDialog object and return it
@@ -176,7 +179,22 @@ class PageFragmentConnectionHistory : Fragment() {
         }
 
         if (next != null && next.size > position) {
-            (activity as MainActivity).connect(next[position].connection)
+            activity?.let {
+                // Use the Builder class for convenient dialog construction
+                val builder = AlertDialog.Builder(it)
+                builder.setMessage("Connect to\n${next[position].name}\nat ${next[position].originalIp}?")
+                    .setPositiveButton("Yes",
+                        DialogInterface.OnClickListener { _, _ ->
+                            (activity as MainActivity).connect(next[position])
+                        })
+                    .setNegativeButton("Cancel",
+                        DialogInterface.OnClickListener { _, _ ->
+                            // User cancelled the dialog
+                        })
+                // Create the AlertDialog object and return it
+                val dialog = builder.create()
+                dialog.show()
+            }
         }
     }
 }

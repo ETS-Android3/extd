@@ -1,9 +1,10 @@
 #!/usr/bin/python3
 
 import base64
-import sys
 import logging
 import socket
+import sys
+
 from cryptography.fernet import Fernet
 
 logging.basicConfig(filename="extd.log", level=logging.INFO)
@@ -18,6 +19,9 @@ def load_key():
 
 private_key = load_key()
 
+# pid = os.fork()
+
+# if pid == 0:
 try:
     handled = False
 
@@ -25,11 +29,12 @@ try:
         split = line.split(":")
 
         # requests from the client are not encrypted
-        if split[1] == "conn" and len(split) == 6:
+        if split[1] == "conn" and len(split) == 7:
             width = int(split[2])
             height = int(split[3])
             password = split[4]
             daemonAddress = ("localhost", int(split[5]))
+            adb = split[6] == "true"
 
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 # authorized_keys = open(
@@ -44,14 +49,14 @@ try:
                 #     print("extd:error:not_authorized")
 
                 # authorized_keys.close()
-                message = f'extd:spawn:{width}:{height}:{password}'
+
+                message = f'extd:spawn:{width}:{height}:{password}:{adb}'
 
                 logging.info(message)
                 # encrypt the message
                 message = private_key.encrypt(message.encode("utf-8"))
                 message = base64.b64encode(message)
                 s.sendto(message, daemonAddress)
-
                 data, daemonAddress = s.recvfrom(512)
 
                 decoded = private_key.decrypt(base64.b64decode(data))

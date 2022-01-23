@@ -53,6 +53,8 @@ def listen(port: int, secret: str, temp_key: str):
     key = key_utils.load_key()
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.settimeout(120)
+
         try:
             message = f'extd:listen:{port}:{secret}:{os.getlogin()}:{temp_key}'
             # encrypt the message
@@ -78,6 +80,13 @@ def listen(port: int, secret: str, temp_key: str):
                 print(f'extd:listen:error:({data})')
 
         except KeyboardInterrupt:
+            message = f'extd:cancel_listen:{port}'
+            # encrypt the message
+            message = key.encrypt(message.encode("utf-8"))
+            message = base64.b64encode(message)
+
+            # request daemon to listen on port, for given secret
+            s.sendto(message, daemon_addr)
             print("extd:listen:cancelled")
 
         except Exception as e:
@@ -98,10 +107,9 @@ if sys.argv[1] == "add":
         exit(1)
 
     lower, upper = get_ports()
-    # port = random.randint(lower, upper)
-    port = 4000
-    # secret = get_random_string(12)
-    secret = "secret"
+    port = random.randint(lower, upper)
+    secret = get_random_string(12)
+    # secret = "secret"
     ips = get_ips()
     now = datetime.datetime.now()
 
