@@ -87,6 +87,7 @@
     <string name="host_and">%1$s and </string>
     <string name="app_name">ExtD</string>
     <string name="searching">Searching...</string>
+    <string name="no_networks">No networks found</string>
     <string name="new_connection">New Connection</string>
     <string name="serverListTitle">Available Computers</string>
     <string name="title_activity_canvas">FullscreenActivity</string>

@@ -1,6 +1,11 @@
 package pjwstk.s18749.extd
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -12,12 +17,6 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import java.io.*
 import java.net.*
 import java.util.*
-import android.content.Intent
-
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.IntentFilter
-import android.util.Log
 
 
 class PageFragmentNewConnection : Fragment() {
@@ -89,11 +88,16 @@ class PageFragmentNewConnection : Fragment() {
 
         btConnect.isEnabled = isValid()
 
+        if (!(requireActivity() as MainActivity).keysReady) {
+            fabQrConnect.visibility = View.GONE
+        }
+
         fabQrConnect.setOnClickListener {
             (requireActivity() as MainActivity).connectFromQR()
         }
 
-        requireActivity().registerReceiver(receiver, IntentFilter("fragmentupdater"))
+        val filter = IntentFilter((requireActivity() as MainActivity).filterKeysChange)
+        requireActivity().registerReceiver(receiver, filter)
 
         return view
     }
@@ -105,7 +109,7 @@ class PageFragmentNewConnection : Fragment() {
     }
 
     private fun isValid(): Boolean {
-        if (!(requireActivity() as MainActivity).keysReady()) return false
+        if (!(requireActivity() as MainActivity).keysReady) return false
 
         try {
             val ip = txIp.text.toString().trim()
@@ -133,11 +137,17 @@ class PageFragmentNewConnection : Fragment() {
 
     private inner class FragmentReceiver : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == "keysReadyChange") {
+            if (intent?.action == (requireActivity() as MainActivity).filterKeysChange) {
                 val keysReady = intent.getBooleanExtra("keysReady", false)
                 Log.d("extd", "$keysReady keys ready")
 
                 btConnect.isEnabled = isValid()
+
+                if (keysReady) {
+                    fabQrConnect.visibility = View.VISIBLE
+                } else {
+                    fabQrConnect.visibility = View.GONE
+                }
             }
         }
     }

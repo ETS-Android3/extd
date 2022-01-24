@@ -15,6 +15,8 @@ data class Connection(
 ) : Serializable, Comparable<Connection> {
     val id: Long = System.currentTimeMillis()
     var lastConnected: Date? = null
+    var isAvailable: Boolean = false
+    var isFromSameNetwork: Boolean = false
 
     override fun compareTo(other: Connection): Int {
         return "$id-$name-$ip-$originalIp-$port-$secret-$password-${createdAt.toString()}".compareTo("${other.id}-${other.name}-${other.ip}-${other.originalIp}-${other.port}-${other.secret}-${other.password}-${other.createdAt.toString()}")

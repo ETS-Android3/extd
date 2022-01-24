@@ -3,6 +3,7 @@ package pjwstk.s18749.extd
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.appcompat.widget.AppCompatImageView
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
@@ -67,6 +68,12 @@ class ConnectionListAdapter(
                     current.lastConnected.toString()
             } else {
                 findViewById<AppCompatTextView>(R.id.tvServerLastConnected).text = "--"
+            }
+
+            if (current.isAvailable) {
+                findViewById<AppCompatImageView>(R.id.ivAvailable).visibility = View.VISIBLE
+            } else {
+                findViewById<AppCompatImageView>(R.id.ivAvailable).visibility = View.GONE
             }
         }
     }

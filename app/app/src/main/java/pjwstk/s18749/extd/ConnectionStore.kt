@@ -22,9 +22,9 @@ class ConnectionStore(
                     }
                 }
             } catch (e: InvalidClassException) {
-                throw RuntimeException("could not load saved connections ${e.message}")
+                throw RuntimeException("could not load saved connections")
             }  catch (e: ClassNotFoundException) {
-                throw RuntimeException("could not load saved connections ${e.message}")
+                throw RuntimeException("could not load saved connections")
             }
         }
 

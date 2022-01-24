@@ -9,12 +9,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.collections.ArrayList
 
 // helper class from https://stackoverflow.com/a/57998099
-abstract class NsdHelper(
-    context: Context
-) {
+abstract class NsdHelper {
     var isDiscovering: Boolean = false
     // Declare DNS-SD related variables for service discovery
-    val nsdManager: NsdManager? = context.getSystemService(Context.NSD_SERVICE) as NsdManager?
+    var nsdManager: NsdManager? = null
     private var discoveryListener: NsdManager.DiscoveryListener? = null
     private var resolveListener: NsdManager.ResolveListener? = null
     private var resolveListenerBusy = AtomicBoolean(false)
@@ -24,13 +22,14 @@ abstract class NsdHelper(
     companion object {
 
         // Type of services to look for
-        const val NSD_SERVICE_TYPE: String = "_ssh._tcp."
+        const val NSD_SERVICE_TYPE: String = "_extd._tcp."
         // Services' Names must start with this
         const val NSD_SERVICE_NAME: String = ""
     }
 
     // Initialize Listeners
-    fun initializeNsd() {
+    fun initializeNsd(context: Context) {
+        nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager?
         // Initialize only resolve listener
         initializeResolveListener()
     }

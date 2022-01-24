@@ -24,13 +24,6 @@
             android:text="@string/new_connection"
             android:textSize="20sp" />
 
-        <ProgressBar
-            android:id="@+id/ncLoading"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_gravity="right"
-            android:visibility="invisible"
-            android:gravity="center" />
     </LinearLayout>
 
     <LinearLayout

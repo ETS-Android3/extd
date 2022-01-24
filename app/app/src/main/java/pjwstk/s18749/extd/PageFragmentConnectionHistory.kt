@@ -1,70 +1,44 @@
 package pjwstk.s18749.extd
 
 import android.app.AlertDialog
-import android.content.DialogInterface
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
-import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import kotlinx.coroutines.*
 
 class PageFragmentConnectionHistory : Fragment() {
-    private var history: List<Connection>? = null
     private val historyConnectionsAdapter =
         ConnectionListAdapter(::onListItemRemove, ::onListItemConnect)
+    private val receiver = FragmentReceiver()
 
     private lateinit var rv: RecyclerView
     private lateinit var emptyMsg: LinearLayout
     private lateinit var loading: LinearLayout
     private lateinit var rf: SwipeRefreshLayout
-    private lateinit var spLoading: ProgressBar
     private lateinit var title: TextView
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-
-    override fun onDestroy() {
-        super.onDestroy()
-
-        scope.cancel()
-    }
 
     fun updateViews() {
-        sort()
-        val next = history
+        val next = (requireActivity() as MainActivity).history
 
-        if (next != null) {
-            historyConnectionsAdapter.update(next.toList())
+        historyConnectionsAdapter.update(next.toList())
 
-            if (next.isEmpty()) {
-                rv.visibility = View.GONE
-                emptyMsg.visibility = View.VISIBLE
-            } else {
-                rv.visibility = View.VISIBLE
-                emptyMsg.visibility = View.GONE
-            }
-        } else {
+        if (next.isEmpty()) {
             rv.visibility = View.GONE
             emptyMsg.visibility = View.VISIBLE
-        }
-    }
-
-
-    private fun sort() {
-        if (history != null) {
-            history = history!!.sortedWith { first: Connection, second: Connection ->
-                if (second.lastConnected != null && first.lastConnected != null) {
-                    second.lastConnected!!.compareTo(first.lastConnected)
-                } else {
-                    second.createdAt.compareTo(first.createdAt)
-                }
-            }
+        } else {
+            rv.visibility = View.VISIBLE
+            emptyMsg.visibility = View.GONE
         }
     }
 
@@ -78,7 +52,6 @@ class PageFragmentConnectionHistory : Fragment() {
         emptyMsg = view.findViewById(R.id.llConnectionHistoryListEmpty)
         loading = view.findViewById(R.id.llConnectionHistoryListLoading)
         rf = view.findViewById(R.id.rfConnectionHistory)
-        spLoading = view.findViewById(R.id.spLoading)
         title = view.findViewById(R.id.txTitleConnectionHistory)
 
         rv.setHasFixedSize(true)
@@ -86,79 +59,53 @@ class PageFragmentConnectionHistory : Fragment() {
         rv.adapter = historyConnectionsAdapter
         registerForContextMenu(rv)
 
-        loadList()
-
         rf.setOnRefreshListener {
-            loadList()
+            loading.visibility = View.VISIBLE
+            (requireActivity() as MainActivity).loadList()
+            rf.isRefreshing = false
+            loading.visibility = View.GONE
         }
+
+        updateViews()
 
         return view
     }
 
-    private fun loadList() {
-        if (history == null || history!!.isEmpty()) {
-            loading.visibility = View.VISIBLE
-        }
+    override fun onResume() {
+        super.onResume()
 
-        scope.launch {
-            try {
-                history = (requireActivity() as MainActivity).store().read()
-                sort()
-            } catch (e: RuntimeException) {
-                requireActivity().runOnUiThread {
-                    Toast.makeText(
-                        requireActivity(),
-                        e.message,
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
-
-            requireActivity().runOnUiThread {
-                loading.visibility = View.GONE
-                rf.isRefreshing = false
-                updateViews()
-            }
-        }
+        val filter = IntentFilter((requireActivity() as MainActivity).filterListChange)
+        requireActivity().registerReceiver(receiver, filter)
     }
 
-    private fun saveList(list: List<Connection>) {
-        scope.launch {
-            sort()
-            (requireActivity() as MainActivity).store().save(list)
+    override fun onPause() {
+        super.onPause()
 
-            requireActivity().runOnUiThread {
-                updateViews()
-            }
-        }
+        requireActivity().unregisterReceiver(receiver)
     }
 
     private fun onListItemRemove(position: Int) {
-        val next = history
+        var next = (requireActivity() as MainActivity).history
 
-        if (next != null && next.size > position) {
+        if (next.size > position) {
             activity?.let {
-                // Use the Builder class for convenient dialog construction
                 val builder = AlertDialog.Builder(it)
                 builder.setMessage("Are you sure you want to delete ${next[position].name}?")
-                    .setPositiveButton("Yes",
-                        DialogInterface.OnClickListener { _, _ ->
-                            var i = 0
+                    .setPositiveButton(
+                        "Yes"
+                    ) { _, _ ->
+                        var i = 0
 
-                            history = next.filter { _ -> i++ != position }
-                            saveList(history!!)
+                        next = next.filter { _ -> i++ != position }
+                        (requireActivity() as MainActivity).saveList(next)
 
-                            Toast.makeText(
-                                requireActivity(),
-                                "done",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        })
-                    .setNegativeButton("Cancel",
-                        DialogInterface.OnClickListener { _, _ ->
-                            // User cancelled the dialog
-                        })
-                // Create the AlertDialog object and return it
+                        Toast.makeText(
+                            requireActivity(),
+                            "done",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+
                 val dialog = builder.create()
                 dialog.show()
             }
@@ -166,9 +113,9 @@ class PageFragmentConnectionHistory : Fragment() {
     }
 
     private fun onListItemConnect(position: Int) {
-        val next = history
+        var next = (requireActivity() as MainActivity).history
 
-        if (!(requireActivity() as MainActivity).keysReady()) {
+        if (!(requireActivity() as MainActivity).keysReady) {
             Toast.makeText(
                 requireActivity(),
                 "keys not ready",
@@ -178,22 +125,26 @@ class PageFragmentConnectionHistory : Fragment() {
             return
         }
 
-        if (next != null && next.size > position) {
+        if (next.size > position) {
             activity?.let {
-                // Use the Builder class for convenient dialog construction
                 val builder = AlertDialog.Builder(it)
                 builder.setMessage("Connect to\n${next[position].name}\nat ${next[position].originalIp}?")
-                    .setPositiveButton("Yes",
-                        DialogInterface.OnClickListener { _, _ ->
-                            (activity as MainActivity).connect(next[position])
-                        })
-                    .setNegativeButton("Cancel",
-                        DialogInterface.OnClickListener { _, _ ->
-                            // User cancelled the dialog
-                        })
-                // Create the AlertDialog object and return it
+                    .setPositiveButton(
+                        "Yes"
+                    ) { _, _ ->
+                        (activity as MainActivity).connect(next[position])
+                    }
+
                 val dialog = builder.create()
                 dialog.show()
+            }
+        }
+    }
+
+    private inner class FragmentReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == (requireActivity() as MainActivity).filterListChange) {
+                updateViews()
             }
         }
     }

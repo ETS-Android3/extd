@@ -1,0 +1,10 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name replace-wildcards="yes">extd on %h</name>
+
+  <service>
+    <type>_extd._tcp</type>
+    <port>__DAEMON_PORT__</port>
+  </service>
+</service-group>
