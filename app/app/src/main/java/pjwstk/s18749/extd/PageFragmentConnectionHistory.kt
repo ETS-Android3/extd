@@ -19,7 +19,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 
 class PageFragmentConnectionHistory : Fragment() {
     private val historyConnectionsAdapter =
-        ConnectionListAdapter(::onListItemRemove, ::onListItemConnect)
+            ConnectionListAdapter(::onListItemConnect, ::onListItemRemove)
     private val receiver = FragmentReceiver()
 
     private lateinit var rv: RecyclerView
@@ -27,13 +27,15 @@ class PageFragmentConnectionHistory : Fragment() {
     private lateinit var loading: LinearLayout
     private lateinit var rf: SwipeRefreshLayout
     private lateinit var title: TextView
+    private var list: ArrayList<Connection> = ArrayList()
 
     fun updateViews() {
-        val next = (requireActivity() as MainActivity).history
+        list.clear()
+        list.addAll((requireActivity() as MainActivity).history)
 
-        historyConnectionsAdapter.update(next.toList())
+        historyConnectionsAdapter.update(list.toList())
 
-        if (next.isEmpty()) {
+        if (list.isEmpty()) {
             rv.visibility = View.GONE
             emptyMsg.visibility = View.VISIBLE
         } else {
@@ -43,9 +45,9 @@ class PageFragmentConnectionHistory : Fragment() {
     }
 
     override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
+            inflater: LayoutInflater,
+            container: ViewGroup?,
+            savedInstanceState: Bundle?
     ): View {
         val view: View = inflater.inflate(R.layout.fragment_connection_history, container, false)
         rv = view.findViewById(R.id.rvConnectionHistoryList)
@@ -66,45 +68,39 @@ class PageFragmentConnectionHistory : Fragment() {
             loading.visibility = View.GONE
         }
 
+        val filter = IntentFilter()
+        filter.addAction((requireActivity() as MainActivity).filterListChange)
+        (requireActivity() as MainActivity).broadcastManager.registerReceiver(receiver, filter)
+
         updateViews()
 
         return view
     }
 
-    override fun onResume() {
-        super.onResume()
+    override fun onDestroy() {
+        super.onDestroy()
 
-        val filter = IntentFilter((requireActivity() as MainActivity).filterListChange)
-        requireActivity().registerReceiver(receiver, filter)
-    }
-
-    override fun onPause() {
-        super.onPause()
-
-        requireActivity().unregisterReceiver(receiver)
+        (requireActivity() as MainActivity).broadcastManager.unregisterReceiver(receiver)
     }
 
     private fun onListItemRemove(position: Int) {
-        var next = (requireActivity() as MainActivity).history
-
-        if (next.size > position) {
+        if (list.size > position) {
             activity?.let {
                 val builder = AlertDialog.Builder(it)
-                builder.setMessage("Are you sure you want to delete ${next[position].name}?")
-                    .setPositiveButton(
-                        "Yes"
-                    ) { _, _ ->
-                        var i = 0
+                builder.setMessage("Are you sure you want to delete ${list[position].name}?")
+                        .setPositiveButton(
+                                "Yes"
+                        ) { _, _ ->
+                            var i = 0
 
-                        next = next.filter { _ -> i++ != position }
-                        (requireActivity() as MainActivity).saveList(next)
+                            (requireActivity() as MainActivity).saveList(list.filter { _ -> i++ != position })
 
-                        Toast.makeText(
-                            requireActivity(),
-                            "done",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
+                            Toast.makeText(
+                                    requireActivity(),
+                                    "done",
+                                    Toast.LENGTH_LONG
+                            ).show()
+                        }
 
                 val dialog = builder.create()
                 dialog.show()
@@ -113,27 +109,31 @@ class PageFragmentConnectionHistory : Fragment() {
     }
 
     private fun onListItemConnect(position: Int) {
-        var next = (requireActivity() as MainActivity).history
+        val act = (requireActivity() as MainActivity)
 
-        if (!(requireActivity() as MainActivity).keysReady) {
+        if (!act.keysReady) {
             Toast.makeText(
-                requireActivity(),
-                "keys not ready",
-                Toast.LENGTH_LONG
+                    requireActivity(),
+                    "keys not ready",
+                    Toast.LENGTH_LONG
             ).show()
 
             return
         }
 
-        if (next.size > position) {
+        if (act.inSession) {
+            return
+        }
+
+        if (list.size > position) {
             activity?.let {
                 val builder = AlertDialog.Builder(it)
-                builder.setMessage("Connect to\n${next[position].name}\nat ${next[position].originalIp}?")
-                    .setPositiveButton(
-                        "Yes"
-                    ) { _, _ ->
-                        (activity as MainActivity).connect(next[position])
-                    }
+                builder.setMessage("Connect to\n${list[position].name}\nat ${list[position].ip}?")
+                        .setPositiveButton(
+                                "Yes"
+                        ) { _, _ ->
+                            (activity as MainActivity).connect(list[position])
+                        }
 
                 val dialog = builder.create()
                 dialog.show()

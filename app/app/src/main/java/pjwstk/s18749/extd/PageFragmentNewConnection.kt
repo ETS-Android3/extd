@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -30,9 +29,9 @@ class PageFragmentNewConnection : Fragment() {
     private val receiver = FragmentReceiver()
 
     override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
+            inflater: LayoutInflater,
+            container: ViewGroup?,
+            savedInstanceState: Bundle?
     ): View {
         val view: View = inflater.inflate(R.layout.fragment_new_connection, container, false)
         txName = view.findViewById(R.id.txName)
@@ -88,7 +87,10 @@ class PageFragmentNewConnection : Fragment() {
 
         btConnect.isEnabled = isValid()
 
-        if (!(requireActivity() as MainActivity).keysReady) {
+        if (
+                !(requireActivity() as MainActivity).keysReady
+                || !(requireActivity() as MainActivity).networkAvailable
+        ) {
             fabQrConnect.visibility = View.GONE
         }
 
@@ -96,8 +98,11 @@ class PageFragmentNewConnection : Fragment() {
             (requireActivity() as MainActivity).connectFromQR()
         }
 
-        val filter = IntentFilter((requireActivity() as MainActivity).filterKeysChange)
-        requireActivity().registerReceiver(receiver, filter)
+        val filter = IntentFilter()
+        filter.addAction((requireActivity() as MainActivity).filterKeysChange)
+        filter.addAction((requireActivity() as MainActivity).filterNetworkChange)
+        filter.addAction((requireActivity() as MainActivity).filterSessionChange)
+        (requireActivity() as MainActivity).broadcastManager.registerReceiver(receiver, filter)
 
         return view
     }
@@ -105,11 +110,12 @@ class PageFragmentNewConnection : Fragment() {
     override fun onDestroy() {
         super.onDestroy()
 
-        requireActivity().unregisterReceiver(receiver)
+        (requireActivity() as MainActivity).broadcastManager.unregisterReceiver(receiver)
     }
 
     private fun isValid(): Boolean {
-        if (!(requireActivity() as MainActivity).keysReady) return false
+        val act = (requireActivity() as MainActivity)
+        if (!act.keysReady || act.inSession) return false
 
         try {
             val ip = txIp.text.toString().trim()
@@ -135,19 +141,32 @@ class PageFragmentNewConnection : Fragment() {
         return false
     }
 
+    private fun sessionChange() {
+        val act = (requireActivity() as MainActivity)
+
+        if (act.inSession) {
+            fabQrConnect.visibility = View.GONE
+        } else {
+            fabQrConnect.visibility = View.VISIBLE
+        }
+    }
+
     private inner class FragmentReceiver : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == (requireActivity() as MainActivity).filterKeysChange) {
-                val keysReady = intent.getBooleanExtra("keysReady", false)
-                Log.d("extd", "$keysReady keys ready")
+            val act = (requireActivity() as MainActivity)
+
+            if (intent?.action == act.filterKeysChange || intent?.action == act.filterNetworkChange) {
+                val keysReady = act.keysReady
 
                 btConnect.isEnabled = isValid()
 
-                if (keysReady) {
+                if (keysReady && act.networkAvailable) {
                     fabQrConnect.visibility = View.VISIBLE
                 } else {
                     fabQrConnect.visibility = View.GONE
                 }
+            } else if (intent?.action == act.filterSessionChange) {
+                sessionChange()
             }
         }
     }

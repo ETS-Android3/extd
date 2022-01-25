@@ -1,116 +1,106 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <LinearLayout
-        android:id="@+id/linearLayout2"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="16dp"
+    <ScrollView
+        android:layout_width="fill_parent"
+        android:layout_height="match_parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <TextView
-            android:id="@+id/txTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="left"
-            android:layout_weight="1"
-            android:text="@string/new_connection"
-            android:textSize="20sp" />
-
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/linearLayout"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/linearLayout2">
-
-        <EditText
-            android:id="@+id/txName"
-            android:hint="Name"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:inputType="text" />
-        <EditText
-            android:id="@+id/txIp"
-            android:hint="Ip"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:inputType="text" />
-        <EditText
-            android:id="@+id/txPort"
-            android:hint="Port"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:inputType="number"/>
-        <EditText
-            android:id="@+id/txSecret"
-            android:hint="Secret"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:inputType="text"/>
-        <EditText
-            android:id="@+id/txKey"
-            android:hint="Key"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:inputType="text"/>
-
-        <Button
-            android:id="@+id/btConnect"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:backgroundTint="@color/primary"
-            android:layout_marginTop="10dp"
-            android:enabled="false"
-            android:text="Connect" />
-    </LinearLayout>
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/linearLayout2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/txTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="left"
+                    android:layout_weight="1"
+                    android:text="@string/new_connection"
+                    android:textSize="20sp" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/linearLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/linearLayout2">
+
+                <EditText
+                    android:id="@+id/txName"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:hint="Name"
+                    android:inputType="text" />
+
+                <EditText
+                    android:id="@+id/txIp"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:hint="Ip"
+                    android:inputType="text" />
+
+                <EditText
+                    android:id="@+id/txPort"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:hint="Port"
+                    android:inputType="number" />
+
+                <EditText
+                    android:id="@+id/txSecret"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:hint="Secret"
+                    android:inputType="text" />
+
+                <EditText
+                    android:id="@+id/txKey"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:hint="Key"
+                    android:inputType="text" />
+
+                <Button
+                    android:id="@+id/btConnect"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="@color/primary"
+                    android:enabled="false"
+                    android:text="Connect" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabQrConnect"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:clickable="true"
-        android:layout_marginRight="10dp"
+        android:layout_marginEnd="10dp"
         android:layout_marginBottom="10dp"
+        android:background="@color/primary"
+        android:clickable="true"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:background="@color/teal_200"
         app:srcCompat="@drawable/qr_code_scanner_black_24dp" />
-
-    <TableLayout
-        android:layout_width="409dp"
-        android:layout_height="373dp"
-        tools:layout_editor_absoluteX="1dp"
-        tools:layout_editor_absoluteY="292dp">
-
-        <TableRow
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-        <TableRow
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-        <TableRow
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-        <TableRow
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-    </TableLayout>
-
 </androidx.constraintlayout.widget.ConstraintLayout>

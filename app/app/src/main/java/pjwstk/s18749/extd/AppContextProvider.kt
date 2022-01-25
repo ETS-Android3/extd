@@ -5,12 +5,17 @@ import android.content.Context
 
 class AppContextProvider : Application() {
 
-    init { INSTANCE = this }
+    init {
+        INSTANCE = this
+    }
 
     companion object {
         lateinit var INSTANCE: AppContextProvider
             private set
 
-        val applicationContext: Context get() { return INSTANCE.applicationContext }
+        val applicationContext: Context
+            get() {
+                return INSTANCE.applicationContext
+            }
     }
 }

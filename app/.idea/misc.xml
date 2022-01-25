@@ -4,9 +4,24 @@
     <option name="filePathToZoomLevelMap">
       <map>
         <entry key="../../../../../../layout/custom_preview.xml" value="0.9651041666666667" />
+        <entry key="app/src/main/res/drawable/box.xml" value="0.7072916666666667" />
         <entry key="app/src/main/res/drawable/east_black_24dp.xml" value="0.6651041666666667" />
+        <entry key="app/src/main/res/drawable/ic_baseline_add_24.xml" value="0.7072916666666667" />
         <entry key="app/src/main/res/drawable/ic_baseline_cast_connected_24.xml" value="0.9526041666666667" />
+        <entry key="app/src/main/res/drawable/ic_baseline_stop_24.xml" value="0.7072916666666667" />
+        <entry key="app/src/main/res/drawable/ic_bookmark_border_green_24dp.xml" value="0.7072916666666667" />
+        <entry key="app/src/main/res/drawable/ic_edit_green_24dp.xml" value="0.7072916666666667" />
+        <entry key="app/src/main/res/drawable/ic_keyboard_grey_48dp.xml" value="0.7072916666666667" />
+        <entry key="app/src/main/res/drawable/ic_launcher.xml" value="0.7072916666666667" />
+        <entry key="app/src/main/res/drawable/ic_launcher_background.xml" value="0.9526041666666667" />
+        <entry key="app/src/main/res/drawable/ic_liberapay_logo.xml" value="0.6026041666666667" />
+        <entry key="app/src/main/res/drawable/ic_menu_black_24dp.xml" value="0.6026041666666667" />
+        <entry key="app/src/main/res/drawable/molecular.xml" value="0.7192708333333333" />
+        <entry key="app/src/main/res/drawable/more_vert.xml" value="0.7072916666666667" />
+        <entry key="app/src/main/res/drawable/responsive.xml" value="0.6026041666666667" />
         <entry key="app/src/main/res/drawable/rounded_rectangle.xml" value="0.7067708333333333" />
+        <entry key="app/src/main/res/drawable/sync_black_24dp.xml" value="0.6026041666666667" />
+        <entry key="app/src/main/res/drawable/touchpad.xml" value="0.6026041666666667" />
         <entry key="app/src/main/res/drawable/vpn_key_black_24dp.xml" value="0.7192708333333333" />
         <entry key="app/src/main/res/drawable/vpn_key_error_24dp.xml" value="0.7192708333333333" />
         <entry key="app/src/main/res/drawable/warning.xml" value="0.9526041666666667" />
@@ -28,7 +43,7 @@
         <entry key="app/src/main/res/layout/editbookmarks.xml" value="0.8197463768115942" />
         <entry key="app/src/main/res/layout/fragment_available_connections.xml" value="0.6520833333333333" />
         <entry key="app/src/main/res/layout/fragment_connection_history.xml" value="0.4554204660587639" />
-        <entry key="app/src/main/res/layout/fragment_new_connection.xml" value="0.67" />
+        <entry key="app/src/main/res/layout/fragment_new_connection.xml" value="0.5" />
         <entry key="app/src/main/res/layout/fragment_quick_connect.xml" value="0.8623188405797102" />
         <entry key="app/src/main/res/layout/fragment_saved_connections.xml" value="0.6489583333333333" />
         <entry key="app/src/main/res/layout/help.xml" value="0.8197463768115942" />
@@ -39,7 +54,9 @@
         <entry key="app/src/main/res/layout/server_list_item.xml" value="0.5869791666666667" />
         <entry key="app/src/main/res/layout/server_list_item_menu.xml" value="0.9510416666666667" />
         <entry key="app/src/main/res/layout/zoom_controls.xml" value="0.5864583333333333" />
+        <entry key="app/src/main/res/menu/mainmenuactivitymenu.xml" value="0.9364583333333333" />
         <entry key="app/src/main/res/menu/vnccanvasactivitymenu.xml" value="0.690625" />
+        <entry key="app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml" value="0.6026041666666667" />
       </map>
     </option>
   </component>

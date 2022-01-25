@@ -1,7 +1,5 @@
 package pjwstk.s18749.extd
 
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import java.net.InetAddress
 import java.net.NetworkInterface
 import java.util.*
@@ -49,33 +47,12 @@ class Util {
             return (subnetInt and mask) == (ipInt and mask)
         }
 
-        fun onlineNotCellular(connectivityManager: ConnectivityManager): Boolean {
-            val capabilities =
-                connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
-
-            if (capabilities != null) {
-                when {
-                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> {
-                        return false
-                    }
-                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> {
-                        return true
-                    }
-                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> {
-                        return true
-                    }
-                }
-            }
-
-            return false
-        }
-
         fun getIPAddresses(): List<String> {
-            var list: ArrayList<String> = ArrayList()
+            val list: ArrayList<String> = ArrayList()
 
             try {
                 val interfaces: List<NetworkInterface> =
-                    Collections.list(NetworkInterface.getNetworkInterfaces())
+                        Collections.list(NetworkInterface.getNetworkInterfaces())
                 for (intf in interfaces) {
                     val mask = intf.interfaceAddresses[1].networkPrefixLength
                     val addrs: List<InetAddress> = Collections.list(intf.inetAddresses)

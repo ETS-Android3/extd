@@ -11,6 +11,7 @@ import kotlin.collections.ArrayList
 // helper class from https://stackoverflow.com/a/57998099
 abstract class NsdHelper {
     var isDiscovering: Boolean = false
+
     // Declare DNS-SD related variables for service discovery
     var nsdManager: NsdManager? = null
     private var discoveryListener: NsdManager.DiscoveryListener? = null
@@ -23,6 +24,7 @@ abstract class NsdHelper {
 
         // Type of services to look for
         const val NSD_SERVICE_TYPE: String = "_extd._tcp."
+
         // Services' Names must start with this
         const val NSD_SERVICE_NAME: String = ""
     }
@@ -48,19 +50,17 @@ abstract class NsdHelper {
             override fun onServiceFound(service: NsdServiceInfo) {
                 // A service was found! Do something with it
 
-                if ( service.serviceType == NSD_SERVICE_TYPE &&
-                    service.serviceName.startsWith(NSD_SERVICE_NAME) ) {
+                if (service.serviceType == NSD_SERVICE_TYPE &&
+                        service.serviceName.startsWith(NSD_SERVICE_NAME)) {
                     // Both service type and service name are the ones we want
                     // If the resolver is free, resolve the service to get all the details
                     if (resolveListenerBusy.compareAndSet(false, true)) {
                         nsdManager?.resolveService(service, resolveListener)
-                    }
-                    else {
+                    } else {
                         // Resolver was busy. Add the service to the list of pending services
                         pendingNsdServices.add(service)
                     }
-                }
-                else {
+                } else {
                     // Not our service. Log message but do nothing else
                 }
             }
@@ -103,7 +103,7 @@ abstract class NsdHelper {
 
     // Instantiate DNS-SD resolve listener to get extra information about the service
     private fun initializeResolveListener() {
-        resolveListener =  object : NsdManager.ResolveListener {
+        resolveListener = object : NsdManager.ResolveListener {
 
             override fun onServiceResolved(service: NsdServiceInfo) {
 
@@ -155,8 +155,7 @@ abstract class NsdHelper {
         if (nextNsdService != null) {
             // There was one. Send to be resolved.
             nsdManager?.resolveService(nextNsdService, resolveListener)
-        }
-        else {
+        } else {
             // There was no pending service. Release the flag
             resolveListenerBusy.set(false)
         }

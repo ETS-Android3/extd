@@ -5,7 +5,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.net.ConnectivityManager
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -22,7 +21,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 class PageFragmentQuickConnect : Fragment() {
     private val availableConnectionsAdapter =
-        ConnectionListAdapter(::onListItemRemove, ::onListItemConnect)
+            ConnectionListAdapter(::onListItemConnect, null)
     private val receiver = FragmentReceiver()
 
     private lateinit var rv: RecyclerView
@@ -33,11 +32,12 @@ class PageFragmentQuickConnect : Fragment() {
     private lateinit var title: TextView
     private lateinit var fabDiscover: FloatingActionButton
     private lateinit var fabDiscovering: FloatingActionButton
+    private var list: ArrayList<Connection> = ArrayList()
 
     override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
+            inflater: LayoutInflater,
+            container: ViewGroup?,
+            savedInstanceState: Bundle?
     ): View {
         val view: View = inflater.inflate(R.layout.fragment_quick_connect, container, false)
 
@@ -55,9 +55,8 @@ class PageFragmentQuickConnect : Fragment() {
         rv.adapter = availableConnectionsAdapter
 
         rf.setOnRefreshListener {
-            checkNetwork()
+            updateViews()
             (requireActivity() as MainActivity).loadList()
-            (requireActivity() as MainActivity).discover()
             rf.isRefreshing = false
             fabDiscovering.visibility = View.VISIBLE
             fabDiscover.visibility = View.GONE
@@ -72,20 +71,35 @@ class PageFragmentQuickConnect : Fragment() {
 
         fabDiscovering.setOnClickListener {
             (requireActivity() as MainActivity).stopDiscovery()
+            updateViews()
             rf.isRefreshing = false
             fabDiscovering.visibility = View.GONE
             fabDiscover.visibility = View.VISIBLE
         }
 
+        val filter = IntentFilter()
+        filter.addAction((requireActivity() as MainActivity).filterListChange)
+        filter.addAction((requireActivity() as MainActivity).filterDiscoveryChange)
+        filter.addAction((requireActivity() as MainActivity).filterNetworkChange)
+
+        (requireActivity() as MainActivity).broadcastManager.registerReceiver(receiver, filter)
+
         updateViews()
-        (requireActivity() as MainActivity).discover()
         checkNetwork()
+
+        if ((requireActivity() as MainActivity).discovering) {
+            fabDiscovering.visibility = View.VISIBLE
+            fabDiscover.visibility = View.GONE
+        } else {
+            fabDiscovering.visibility = View.GONE
+            fabDiscover.visibility = View.VISIBLE
+        }
 
         return view
     }
 
     private fun checkNetwork() {
-        if (Util.onlineNotCellular((requireActivity() as MainActivity).getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager)) {
+        if ((requireActivity() as MainActivity).networkAvailable) {
             noNetworks.visibility = View.GONE
             fabDiscover.visibility = View.VISIBLE
         } else {
@@ -94,88 +108,68 @@ class PageFragmentQuickConnect : Fragment() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
+    override fun onDestroy() {
+        super.onDestroy()
 
-        val filter = IntentFilter()
-        filter.addAction((requireActivity() as MainActivity).filterListChange)
-        filter.addAction((requireActivity() as MainActivity).filterDiscoveryChange)
-
-        requireActivity().registerReceiver(receiver, filter)
-    }
-
-    override fun onPause() {
-        super.onPause()
-
-        requireActivity().unregisterReceiver(receiver)
+        (requireActivity() as MainActivity).broadcastManager.unregisterReceiver(receiver)
     }
 
     private fun updateViews() {
         val act = (requireActivity() as MainActivity)
         val next = act.history.filter { item -> item.isFromSameNetwork || item.isAvailable }
+        list.clear()
 
-        availableConnectionsAdapter.update(next.toList())
+        for (item in next) {
+            val similar =
+                    list.find { similar -> item.name == similar.name && item.ip == similar.ip }
 
-        if (next.isEmpty()) {
+            if (similar == null) {
+                list.add(item)
+            } else {
+                similar.isAvailable == similar.isAvailable || item.isAvailable
+                similar.isFromSameNetwork == similar.isFromSameNetwork || item.isFromSameNetwork
+            }
+        }
+
+        availableConnectionsAdapter.update(list.toList())
+
+        if (list.isEmpty()) {
             rv.visibility = View.GONE
             emptyMsg.visibility = View.VISIBLE
         } else {
             rv.visibility = View.VISIBLE
             emptyMsg.visibility = View.GONE
         }
-    }
 
-    private fun onListItemRemove(position: Int) {
-        val act = (requireActivity() as MainActivity)
-        val next = act.history
-
-        if (next.size > position) {
-            activity?.let {
-                val builder = AlertDialog.Builder(it)
-                builder.setMessage("Are you sure you want to delete ${next[position].name}?")
-                    .setPositiveButton(
-                        "Yes"
-                    ) { _, _ ->
-                        var i = 0
-
-                        act.saveList(next.filter { _ -> i++ != position })
-
-                        Toast.makeText(
-                            requireActivity(),
-                            "done",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                // Create the AlertDialog object and return it
-                val dialog = builder.create()
-                dialog.show()
-            }
-        }
+        checkNetwork()
     }
 
     private fun onListItemConnect(position: Int) {
         val act = (requireActivity() as MainActivity)
-        val next = act.history
 
         if (!act.keysReady) {
             Toast.makeText(
-                requireActivity(),
-                "keys not ready",
-                Toast.LENGTH_LONG
+                    requireActivity(),
+                    "keys not ready",
+                    Toast.LENGTH_LONG
             ).show()
 
             return
         }
 
-        if (next.size > position) {
+        if (act.inSession) {
+            return
+        }
+
+        if (list.size > position) {
             activity?.let {
                 val builder = AlertDialog.Builder(it)
-                builder.setMessage("Connect to\n${next[position].name}\nat ${next[position].originalIp}?")
-                    .setPositiveButton(
-                        "Yes"
-                    ) { _, _ ->
-                        act.connect(next[position])
-                    }
+                builder.setMessage("Connect to\n${list[position].name}\nat ${list[position].ip}?")
+                        .setPositiveButton(
+                                "Yes"
+                        ) { _, _ ->
+                            act.connect(list[position])
+                        }
 
                 val dialog = builder.create()
                 dialog.show()
@@ -186,7 +180,6 @@ class PageFragmentQuickConnect : Fragment() {
     private inner class FragmentReceiver : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val act = (requireActivity() as MainActivity)
-            Log.d("extd", "got ${intent?.action}")
 
             if (intent?.action == act.filterListChange) {
                 updateViews()
@@ -198,7 +191,8 @@ class PageFragmentQuickConnect : Fragment() {
                     fabDiscovering.visibility = View.GONE
                     fabDiscover.visibility = View.VISIBLE
                 }
-            } else if (intent?.action == "android.net.conn.CONNECTIVITY_CHANGE") {
+            } else if (intent?.action == act.filterNetworkChange) {
+                Log.d("extd", "checking net")
                 checkNetwork()
             }
         }

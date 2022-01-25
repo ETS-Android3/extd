@@ -8,15 +8,13 @@ package pjwstk.s18749.extd.multivnc;
  * @author Michael A. MacDonald
  */
 class ZoomScaling {
-
-    static final String TAG = "ZoomScaling";
-
-    float currentScale = 1;
-    float minimumScale = 1;
-    float maximumScale = 4;
+    float currentScale;
+    float minimumScale;
+    float maximumScale;
     VncCanvasActivity activity;
 
-    ZoomScaling(VncCanvasActivity activity, float minimumScale, float maximumScale) {
+    ZoomScaling(VncCanvasActivity activity, float currentScale, float minimumScale, float maximumScale) {
+        this.currentScale = currentScale;
         this.minimumScale = minimumScale;
         this.maximumScale = maximumScale;
         this.activity = activity;
@@ -68,6 +66,5 @@ class ZoomScaling {
         int focusShiftY = (int) (fy * (1 - scaleFactor));
         activity.vncCanvas.pan(-focusShiftX, -focusShiftY);
     }
-
 }
 

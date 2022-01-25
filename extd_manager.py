@@ -114,7 +114,7 @@ if sys.argv[1] == "add":
     now = datetime.datetime.now()
 
     temp_key = key_utils.newkey().decode("utf-8")
-    name = f'{socket.gethostname()}_{now.strftime("%m-%d-%Y")}'
+    name = f'{socket.gethostname()}'
     data = f'extd://{",".join(ips)}:{port}:{secret}:{name}:{temp_key}'
 
     subprocess.run(["qrencode", "-t", "UTF8", data])

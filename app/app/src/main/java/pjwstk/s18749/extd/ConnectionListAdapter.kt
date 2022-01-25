@@ -7,17 +7,20 @@ import androidx.appcompat.widget.AppCompatImageView
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
+import java.text.SimpleDateFormat
+import java.util.*
+import kotlin.collections.ArrayList
 
 class ConnectionListAdapter(
-    private val onItemRemove: (position: Int) -> Unit,
-    private val onItemConnect: (position: Int) -> Unit
+        private val onItemConnect: (position: Int) -> Unit,
+        private val onItemRemove: ((position: Int) -> Unit)?
 ) : RecyclerView.Adapter<ConnectionListAdapter.ConnectionListViewHolder>() {
     private var list: List<Connection> = ArrayList()
 
     class ConnectionListViewHolder(
-        itemView: View,
-        private val onListItemClick: (position: Int) -> Unit,
-        private val onLongListItemClick: (position: Int) -> Unit
+            itemView: View,
+            private val onListItemClick: (position: Int) -> Unit,
+            private val onLongListItemClick: ((position: Int) -> Unit)?
     ) : RecyclerView.ViewHolder(itemView), View.OnClickListener, View.OnLongClickListener {
         init {
             itemView.setOnClickListener(this)
@@ -31,24 +34,24 @@ class ConnectionListAdapter(
 
         override fun onLongClick(v: View?): Boolean {
             val position = adapterPosition
-            onLongListItemClick(position)
+            onLongListItemClick?.invoke(position)
 
             return true
         }
     }
 
     override fun onCreateViewHolder(
-        parent: ViewGroup,
-        viewType: Int
+            parent: ViewGroup,
+            viewType: Int
     ): ConnectionListViewHolder {
         return ConnectionListViewHolder(
-            LayoutInflater.from(parent.context).inflate(
-                R.layout.server_list_item,
-                parent,
-                false
-            ),
-            onItemConnect,
-            onItemRemove
+                LayoutInflater.from(parent.context).inflate(
+                        R.layout.server_list_item,
+                        parent,
+                        false
+                ),
+                onItemConnect,
+                onItemRemove
         )
     }
 
@@ -61,11 +64,13 @@ class ConnectionListAdapter(
 
         holder.itemView.apply {
             findViewById<AppCompatTextView>(R.id.tvServerName).text = current.name
-            findViewById<AppCompatTextView>(R.id.tvServerIp).text = current.originalIp
+            findViewById<AppCompatTextView>(R.id.tvServerIp).text = current.ip
 
             if (current.lastConnected != null) {
-                findViewById<AppCompatTextView>(R.id.tvServerLastConnected).text =
-                    current.lastConnected.toString()
+                val dateFormatter = SimpleDateFormat("HH:mm EE MMM d, yyyy", Locale.getDefault())
+                val formatted = dateFormatter.format(current.lastConnected!!)
+
+                findViewById<AppCompatTextView>(R.id.tvServerLastConnected).text = formatted
             } else {
                 findViewById<AppCompatTextView>(R.id.tvServerLastConnected).text = "--"
             }

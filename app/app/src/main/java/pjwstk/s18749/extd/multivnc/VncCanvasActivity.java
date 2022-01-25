@@ -21,23 +21,21 @@ package pjwstk.s18749.extd.multivnc;
 // CanvasView is the Activity for showing VNC Desktop.
 //
 
-import java.util.List;
-
-
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.Dialog;
 import android.app.ProgressDialog;
-import android.text.ClipboardManager;
+import android.content.Context;
 import android.content.DialogInterface;
+import android.content.DialogInterface.OnDismissListener;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.DialogInterface.OnDismissListener;
+import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.text.ClipboardManager;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.InputDevice;
@@ -48,22 +46,19 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.ImageButton;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.view.inputmethod.InputMethodManager;
-import android.content.Context;
+
+import java.util.List;
 
 import pjwstk.s18749.extd.R;
 
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-
 @SuppressWarnings("deprecation")
 public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemClickListener {
-
-
     private final static String TAG = "VncCanvasActivity";
-
 
     public VncCanvas vncCanvas;
     private ConnectionBean connection;
@@ -73,7 +68,6 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
     PointerInputHandler inputHandler;
 
     ViewGroup mousebuttons;
-    TouchPointView touchpoints;
     Toast notificationToast;
     PopupMenu fabMenu;
 
@@ -144,7 +138,7 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
         /*
          * Setup floating action button & associated menu
          */
-        FloatingActionButton fab = findViewById(R.id.fab);
+        ImageButton fab = findViewById(R.id.fab);
         fab.setOnClickListener(view -> {
             Log.d(TAG, "FAB onClick");
             prepareFabMenu(fabMenu);
@@ -280,8 +274,8 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
         if (!prefs.getBoolean(Constants.PREFS_KEY_MOUSEBUTTONS, true))
             mousebuttons.setVisibility(View.GONE);
 
-        touchpoints = (TouchPointView) findViewById(R.id.touchpoints);
-        touchpoints.setInputHandler(inputHandler);
+//        touchpoints = (TouchPointView) findViewById(R.id.touchpoints);
+//        touchpoints.setInputHandler(inputHandler);
 
         // create an empty toast. we do this do be able to cancel
         notificationToast = Toast.makeText(this, "", Toast.LENGTH_SHORT);
@@ -298,14 +292,9 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
      * color mode (already done), scaling
      */
     void setModes() {
-        float minScale = vncCanvas.getMinimumScale();
-        vncCanvas.scaling = new ZoomScaling(this, minScale, 4);
+        float current = vncCanvas.getFitScale(getResources().getConfiguration().orientation != Configuration.ORIENTATION_PORTRAIT);
+        vncCanvas.scaling = new ZoomScaling(this, current, .1f, 4);
     }
-
-    ConnectionBean getConnection() {
-        return connection;
-    }
-
 
     @Override
     protected void onStop() {
@@ -351,7 +340,6 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
                 //unused
             }
         }
-
     }
 
     /**
@@ -359,13 +347,6 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
      */
     private void prepareFabMenu(PopupMenu popupMenu) {
         Menu menu = popupMenu.getMenu();
-        if (touchpoints.getVisibility() == View.VISIBLE) {
-            menu.findItem(R.id.itemColorMode).setVisible(false);
-            menu.findItem(R.id.itemTogglePointerHighlight).setVisible(false);
-        } else {
-            menu.findItem(R.id.itemColorMode).setVisible(true);
-            menu.findItem(R.id.itemTogglePointerHighlight).setVisible(true);
-        }
 
         // changing pixel format without Fence extension (https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#clientfence) not safely possible
         menu.findItem(R.id.itemColorMode).setVisible(false);
@@ -373,28 +354,15 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
 
     @Override
     public boolean onMenuItemClick(MenuItem item) {
-
         SharedPreferences.Editor ed = prefs.edit();
 
         switch (item.getItemId()) {
-            case R.id.itemInfo:
-                vncCanvas.showConnectionInfo();
+            case R.id.itemFitToScreen:
+                setModes();
                 return true;
-            case R.id.itemSpecialKeys:
-                showDialog(R.layout.metakey);
-                return true;
+
             case R.id.itemColorMode:
                 selectColorModel();
-                return true;
-            case R.id.itemToggleFramebufferUpdate:
-                if (vncCanvas.vncConn.toggleFramebufferUpdates()) // view enabled
-                {
-                    vncCanvas.setVisibility(View.VISIBLE);
-                    touchpoints.setVisibility(View.GONE);
-                } else {
-                    vncCanvas.setVisibility(View.GONE);
-                    touchpoints.setVisibility(View.VISIBLE);
-                }
                 return true;
 
             case R.id.itemToggleMouseButtons:
@@ -422,36 +390,21 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
                 toggleKeyboard();
                 return true;
 
-            case R.id.itemSendKeyAgain:
-                sendSpecialKeyAgain();
-                return true;
             case R.id.itemDisconnect:
                 new AlertDialog.Builder(this)
                         .setMessage(getString(R.string.disconnect_question))
-                        .setPositiveButton(getString(android.R.string.yes), new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int whichButton) {
-                                vncCanvas.vncConn.shutdown();
-                                finish();
-                            }
-                        }).setNegativeButton(getString(android.R.string.no), new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int whichButton) {
-                        // Do nothing.
-                    }
-                }).show();
+                        .setPositiveButton(getString(android.R.string.yes), (dialog, whichButton) -> {
+                            vncCanvas.vncConn.shutdown();
+                            finish();
+                        }).setNegativeButton(getString(android.R.string.no), (dialog, whichButton) -> {
+                            // Do nothing.
+                        }).show();
                 return true;
             default:
                 break;
         }
+
         return super.onOptionsItemSelected(item);
-    }
-
-    MetaKeyBean lastSentKey;
-
-    private void sendSpecialKeyAgain() {
-//        if (lastSentKey == null) {
-//            lastSentKey = database.getMetaKeyDao().get(connection.lastMetaKeyId);
-//        }
-        vncCanvas.sendMetaKey(lastSentKey);
     }
 
     private void toggleKeyboard() {
@@ -463,12 +416,13 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
     @Override
     protected void onDestroy() {
         super.onDestroy();
+
         if (isFinishing()) {
             try {
                 inputHandler.shutdown();
                 vncCanvas.vncConn.shutdown();
                 vncCanvas.onDestroy();
-            } catch (NullPointerException e) {
+            } catch (NullPointerException ignored) {
             }
         }
     }
@@ -485,7 +439,6 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
         }
 
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-
             // handle right mouse button of USB-OTG devices
             // Also, https://fossies.org/linux/SDL2/android-project/app/src/main/java/org/libsdl/app/SDLActivity.java line 1943 states:
             // 12290 = Samsung DeX mode desktop mouse
@@ -508,16 +461,12 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
             else {
                 new AlertDialog.Builder(this)
                         .setMessage(getString(R.string.disconnect_question))
-                        .setPositiveButton(getString(android.R.string.yes), new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int whichButton) {
-                                vncCanvas.vncConn.shutdown();
-                                finish();
-                            }
-                        }).setNegativeButton(getString(android.R.string.no), new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int whichButton) {
-                        // Do nothing.
-                    }
-                }).show();
+                        .setPositiveButton(getString(android.R.string.yes), (dialog, whichButton) -> {
+                            vncCanvas.vncConn.shutdown();
+                            finish();
+                        }).setNegativeButton(getString(android.R.string.no), (dialog, whichButton) -> {
+                            // Do nothing.
+                        }).show();
                 return true;
             }
         }
@@ -594,28 +543,23 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
         }
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setSingleChoiceItems(choices, currentSelection, new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int item) {
-                try {
-                    dialog.dismiss();
-                } catch (Exception e) {
-                }
-                COLORMODEL cm = COLORMODEL.values()[item];
-                vncCanvas.vncConn.setColorModel(cm);
-                connection.colorModel = cm.nameString();
-                Toast.makeText(VncCanvasActivity.this,
-                        "Updating Color Model to " + cm.toString(),
-                        Toast.LENGTH_SHORT).show();
+        builder.setSingleChoiceItems(choices, currentSelection, (dialog, item) -> {
+            try {
+                dialog.dismiss();
+            } catch (Exception ignored) {
             }
+            COLORMODEL cm = COLORMODEL.values()[item];
+            vncCanvas.vncConn.setColorModel(cm);
+            connection.colorModel = cm.nameString();
+            Toast.makeText(VncCanvasActivity.this,
+                    "Updating Color Model to " + cm.toString(),
+                    Toast.LENGTH_SHORT).show();
         });
         AlertDialog dialog = builder.create();
-        dialog.setOnDismissListener(new OnDismissListener() {
-            @Override
-            public void onDismiss(DialogInterface arg0) {
-                Log.i(TAG, "Color Model Selector dismissed");
-                // Restore desktop repaints
-                vncCanvas.enableRepaints();
-            }
+        dialog.setOnDismissListener(arg0 -> {
+            Log.i(TAG, "Color Model Selector dismissed");
+            // Restore desktop repaints
+            vncCanvas.enableRepaints();
         });
         dialog.show();
     }
@@ -671,5 +615,12 @@ public class VncCanvasActivity extends Activity implements PopupMenu.OnMenuItemC
                         | View.SYSTEM_UI_FLAG_FULLSCREEN);
     }
 
+    @Override
+    public void onConfigurationChanged(Configuration cf) {
+        super.onConfigurationChanged(cf);
+
+        float current = vncCanvas.getFitScale(true);
+        vncCanvas.scaling = new ZoomScaling(this, current, .1f, 4);
+    }
 }
 

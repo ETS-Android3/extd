@@ -1,10 +1,8 @@
 package pjwstk.s18749.extd
 
-import android.content.Context
-import android.content.DialogInterface
-import android.content.Intent
+import android.content.*
 import android.content.pm.PackageManager
-import android.net.ConnectivityManager
+import android.net.Network
 import android.net.nsd.NsdServiceInfo
 import android.os.Bundle
 import android.util.Log
@@ -31,16 +29,23 @@ import kotlin.collections.ArrayList
 
 class MainActivity : AppCompatActivity() {
     private val CAMERA_CODE = 123
+    lateinit var broadcastManager: LocalBroadcastManager
     private lateinit var binding: ActivityMainBinding
     private val connectionUtils: ConnectionUtils = ConnectionUtils()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val connectionStateMonitor =
+            ConnectionStateMonitor(::onNetworkAvailable, ::onNetworkNotAvailable)
 
     val filterListChange = "pjwstk.s18749.extd.list.change"
     val filterDiscoveryChange = "pjwstk.s18749.extd.discovery.change"
     val filterKeysChange = "pjwstk.s18749.extd.keys.change"
+    val filterNetworkChange = "pjwstk.s18749.extd.network.change"
+    val filterSessionChange = "pjwstk.s18749.extd.session.change"
 
     var keysReady = false
     var discovering = false
+    var networkAvailable = false
+    var inSession = false
 
     lateinit var store: ConnectionStore
     val available = HashMap<String, String>()
@@ -48,38 +53,52 @@ class MainActivity : AppCompatActivity() {
 
     private val nsdHelper: NsdHelper = object : NsdHelper() {
         override fun onNsdServiceResolved(service: NsdServiceInfo) {
-            if (!available.containsKey(service.serviceName)) Toast.makeText(
-                this@MainActivity,
-                "found service ${service.serviceName}",
-                Toast.LENGTH_LONG
-            ).show()
+            if (!available.containsKey(service.serviceName)) {
+                Toast.makeText(
+                        this@MainActivity,
+                        "found service ${service.serviceName}",
+                        Toast.LENGTH_LONG
+                ).show()
 
-            available[service.serviceName] = service.host.toString()
+                available[service.serviceName] = service.host.toString().substring(1)
 
-            updateViews()
+                updateViews()
+            }
         }
 
         override fun onNsdServiceLost(service: NsdServiceInfo) {
-            if (available.containsKey(service.serviceName)) Toast.makeText(
-                this@MainActivity,
-                "lost service ${service.serviceName}",
-                Toast.LENGTH_LONG
-            ).show()
-            available.remove(service.serviceName)
+            if (available.containsKey(service.serviceName)) {
+                Toast.makeText(
+                        this@MainActivity,
+                        "lost service ${service.serviceName}",
+                        Toast.LENGTH_LONG
+                ).show()
 
-            updateViews()
+                available.remove(service.serviceName)
+
+                updateViews()
+            }
         }
     }
 
     private var activityLauncher: ActivityResultLauncher<Intent> =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            loadList()
-            connectionUtils.close()
-        }
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+                updateViews()
+                connectionUtils.close()
+                inSession = false
+
+                runOnUiThread {
+                    binding.rlConnecting.visibility = View.GONE
+                }
+
+                val i = Intent(filterSessionChange)
+                broadcastManager.sendBroadcast(i)
+            }
 
     override fun onDestroy() {
         super.onDestroy()
 
+        connectionStateMonitor.disable(this)
         connectionUtils.close()
         stopDiscovery()
         scope.cancel()
@@ -94,11 +113,15 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
 
+        updateViews()
         discover()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        connectionStateMonitor.enable(this)
+        broadcastManager = LocalBroadcastManager.getInstance(this)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -108,6 +131,15 @@ class MainActivity : AppCompatActivity() {
 
         binding.btRetryGeneratingKeys.setOnClickListener {
             checkOrGenerateKeys()
+        }
+
+        binding.fabCancelConnecting.setOnClickListener {
+            connectionUtils.close()
+            inSession = false
+            binding.rlConnecting.visibility = View.GONE
+
+            val i = Intent(filterSessionChange)
+            broadcastManager.sendBroadcast(i)
         }
 
         val intent = intent
@@ -122,6 +154,7 @@ class MainActivity : AppCompatActivity() {
 
         nsdHelper.initializeNsd(this)
         loadList()
+        discover()
     }
 
     /**
@@ -142,9 +175,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
+            requestCode: Int,
+            permissions: Array<out String>,
+            grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
@@ -171,6 +204,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun connect(ip: String, port: Int, secret: String, key: String, name: String = "") {
+        if (inSession) return
+
         if (!keysReady) {
             val builder = android.app.AlertDialog.Builder(this)
             builder.setMessage("Keys are not ready.\nAborting.")
@@ -180,13 +215,31 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        if (!networkAvailable) {
+            val builder = android.app.AlertDialog.Builder(this)
+            builder.setMessage("Your device is offline, or has only access to cellular network.")
+            val dialog = builder.create()
+            dialog.show()
+
+            return
+        }
+
         Toast.makeText(this, "Attempting to connect to $ip:$port ($secret)", Toast.LENGTH_SHORT)
-            .show()
+                .show()
 
         scope.launch {
             try {
+                inSession = true
+                runOnUiThread {
+                    binding.rlConnecting.visibility = View.VISIBLE
+                }
+
+                val i = Intent(filterSessionChange)
+                broadcastManager.sendBroadcast(i)
+
                 val conn = connectionUtils.connect(ip, port, secret, Util.randomPass(12), key, name)
                 saveInHistory(conn)
+
 
             } catch (e: RuntimeException) {
                 runOnUiThread {
@@ -195,12 +248,20 @@ class MainActivity : AppCompatActivity() {
 
                     val dialog = builder.create()
                     dialog.show()
+
+                    inSession = false
+                    binding.rlConnecting.visibility = View.GONE
+
+                    val i = Intent(filterSessionChange)
+                    broadcastManager.sendBroadcast(i)
                 }
             }
         }
     }
 
     fun connect(conn: Connection) {
+        if (inSession) return
+
         if (!keysReady) {
             val builder = android.app.AlertDialog.Builder(this)
             builder.setMessage("Keys are not ready.\nAborting.")
@@ -210,54 +271,88 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        Toast.makeText(
-            this,
-            "Attempting to connect to ${conn.ip}:${conn.port} (${conn.secret})",
-            Toast.LENGTH_SHORT
-        ).show()
+        if (!networkAvailable) {
+            val builder = android.app.AlertDialog.Builder(this)
+            builder.setMessage("Your device is offline, or has only access to cellular network.")
+            val dialog = builder.create()
+            dialog.show()
+        }
+
+        val doConnect = {
+            Toast.makeText(
+                    this,
+                    "Attempting to connect to ${conn.ip}:${conn.port} (${conn.secret})",
+                    Toast.LENGTH_SHORT
+            ).show()
+
+            scope.launch {
+                try {
+                    inSession = true
+                    runOnUiThread {
+                        binding.rlConnecting.visibility = View.VISIBLE
+                    }
+
+                    val i = Intent(filterSessionChange)
+                    broadcastManager.sendBroadcast(i)
+
+                    val cp = connectionUtils.connect(conn)
+                    processConnection(cp)
+
+                } catch (e: RuntimeException) {
+                    runOnUiThread {
+                        val builder = android.app.AlertDialog.Builder(this@MainActivity)
+                        builder.setMessage(e.message)
+
+                        val dialog = builder.create()
+                        dialog.show()
+
+                        inSession = false
+                        binding.rlConnecting.visibility = View.GONE
+
+                        val i = Intent(filterSessionChange)
+                        broadcastManager.sendBroadcast(i)
+                    }
+                }
+            }
+        }
 
         val ipAddresses = Util.getIPAddresses()
 
         if (ipAddresses.isEmpty()) {
             val builder = android.app.AlertDialog.Builder(this)
             builder.setMessage("No networks detected.\nIf you intend to connect using USB Tethering, turn off cellular data as it disallows the app to read your tether ip.")
+                    .setPositiveButton(
+                            "Try to connect anyway."
+                    ) { _, _ ->
+                        doConnect()
+                    }
             val dialog = builder.create()
             dialog.show()
             return
         }
 
-        var ok = false
-
         for (subnet in ipAddresses) {
-            if (Util.sameNetwork(conn.originalIp, subnet)) {
-                ok = true
-                break
+            if (Util.sameNetwork(conn.ip, subnet)) {
+                doConnect()
+                return
             }
         }
 
-        if (!ok) {
-            val builder = android.app.AlertDialog.Builder(this)
-            builder.setMessage(
+        val builder = android.app.AlertDialog.Builder(this)
+        builder.setMessage(
                 "This server does not seem to be in the common network with this device.\nYour ip's:${
                     ipAddresses.joinToString(
-                        ","
+                            ","
                     )
-                }\nTarget ip: ${conn.originalIp}"
-            )
-            val dialog = builder.create()
-            dialog.show()
-            return
-        }
+                }\nTarget ip: ${conn.ip}"
+        )
 
-        scope.launch {
-            val cp = connectionUtils.connect(conn)
-            processConnection(cp)
-        }
+        val dialog = builder.create()
+        dialog.show()
     }
 
     fun discover() {
-        if (!Util.onlineNotCellular(getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager)) {
-            Toast.makeText(this, "Offline or on cellular network", Toast.LENGTH_LONG).show()
+        if (!networkAvailable) {
             stopDiscovery()
 
             return
@@ -267,16 +362,10 @@ class MainActivity : AppCompatActivity() {
         discovering = true
 
         val i = Intent(filterDiscoveryChange)
-        LocalBroadcastManager.getInstance(this).sendBroadcast(i)
+        broadcastManager.sendBroadcast(i)
 
         if (!wasDiscovering) {
-            Toast.makeText(this, "searching...", Toast.LENGTH_SHORT).show()
-
-            scope.launch {
-                nsdHelper.discoverServices()
-                delay(15_000)
-                stopDiscovery()
-            }
+            nsdHelper.discoverServices()
         }
     }
 
@@ -284,12 +373,8 @@ class MainActivity : AppCompatActivity() {
         nsdHelper.stopDiscovery()
         discovering = false
 
-        runOnUiThread {
-            Toast.makeText(this, "search done", Toast.LENGTH_SHORT).show()
-        }
-
         val i = Intent(filterDiscoveryChange)
-        LocalBroadcastManager.getInstance(this).sendBroadcast(i)
+        broadcastManager.sendBroadcast(i)
     }
 
     fun updateViews() {
@@ -297,8 +382,9 @@ class MainActivity : AppCompatActivity() {
 
         history = history.map { item ->
             item.isFromSameNetwork =
-                ipAddresses.any { internal -> Util.sameNetwork(item.originalIp, internal) }
-            item.isAvailable = available.values.any { internal -> Util.sameNetwork(item.originalIp, internal) }
+                    ipAddresses.any { internal -> Util.sameNetwork(item.ip, internal) }
+            item.isAvailable =
+                    available.values.any { internal -> item.ip == internal }
             item
         }.sortedWith { first: Connection, second: Connection ->
             if (second.lastConnected != null && first.lastConnected != null) {
@@ -309,7 +395,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val i = Intent(filterListChange)
-        LocalBroadcastManager.getInstance(this).sendBroadcast(i)
+        broadcastManager.sendBroadcast(i)
     }
 
     fun loadList() {
@@ -325,9 +411,9 @@ class MainActivity : AppCompatActivity() {
             } catch (e: RuntimeException) {
                 runOnUiThread {
                     Toast.makeText(
-                        this@MainActivity,
-                        e.message,
-                        Toast.LENGTH_LONG
+                            this@MainActivity,
+                            e.message,
+                            Toast.LENGTH_LONG
                     ).show()
                 }
             }
@@ -342,11 +428,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun connectFromQR() {
-        if (hasCameraAccess()) {
+        if (hasCameraAccess() && networkAvailable) {
             cameraTask()
         } else {
             requestPermissions(arrayOf(android.Manifest.permission.CAMERA), CAMERA_CODE)
         }
+    }
+
+    private fun onNetworkAvailable(network: Network) {
+        networkAvailable = true
+        updateViews()
+
+        val i = Intent(filterNetworkChange)
+        broadcastManager.sendBroadcast(i)
+    }
+
+    private fun onNetworkNotAvailable() {
+        networkAvailable = false
+        updateViews()
+
+        val i = Intent(filterNetworkChange)
+        broadcastManager.sendBroadcast(i)
+        Toast.makeText(this, "Offline or on cellular network", Toast.LENGTH_LONG).show()
     }
 
     private fun saveInHistory(conn: Connection) {
@@ -362,6 +465,12 @@ class MainActivity : AppCompatActivity() {
 
         if (old != null) {
             next.addAll(old)
+        }
+
+        var exists = next.find { item -> item.name == conn.name && item.ip == conn.ip }
+
+        if (exists != null) {
+            next.remove(exists)
         }
 
         next.add(conn)
@@ -389,7 +498,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun onConnectionReady(conn: Connection) {
         val bean = ConnectionBean()
-        bean.address = conn.ip
+        bean.address = "127.0.0.1"
         bean.name = conn.name
         bean.port = conn.port
         bean.password = conn.password
@@ -424,32 +533,7 @@ class MainActivity : AppCompatActivity() {
         val args = connectionString.replace("extd://", "").split(":")
         val ipAddresses = Util.getIPAddresses()
 
-        if (ipAddresses.isEmpty()) {
-            val builder = android.app.AlertDialog.Builder(this)
-            builder.setMessage("No networks detected.\nIf you intend to connect using USB Tethering, turn off cellular data as it disallows the app to read your tether ip.")
-            val dialog = builder.create()
-            dialog.show()
-            return
-        }
-
         if (args.size == 5) {
-            val ips = args[0].split(",")
-                .filter { ip -> ipAddresses.any { internal -> Util.sameNetwork(ip, internal) } }
-
-            if (ips.isEmpty()) {
-                val builder = android.app.AlertDialog.Builder(this)
-                builder.setMessage(
-                    "This server does not seem to be in the common network with this device.\nYour ip's:${
-                        ipAddresses.joinToString(
-                            ","
-                        )
-                    }\nTarget ip's: ${args[0]}"
-                )
-                val dialog = builder.create()
-                dialog.show()
-                return
-            }
-
             val secret = args[2]
             val name = args[3]
             val key = args[4]
@@ -469,17 +553,44 @@ class MainActivity : AppCompatActivity() {
                 return
             }
 
-            if (ips.size > 1) {
-                val alertDialogBuilder = AlertDialog.Builder(this)
-                alertDialogBuilder.setTitle("Choose ip")
-                alertDialogBuilder.setItems(ips.toTypedArray()) { _: DialogInterface, i: Int ->
-                    connect(ips[i], port, secret, key, name)
+            fun doConnect(ips: List<String>) {
+                if (ips.size > 1) {
+                    val alertDialogBuilder = AlertDialog.Builder(this)
+                    alertDialogBuilder.setTitle("Choose ip")
+                    alertDialogBuilder.setItems(ips.toTypedArray()) { _: DialogInterface, i: Int ->
+                        connect(ips[i], port, secret, key, name)
+                    }
+                    val alertDialog = alertDialogBuilder.create()
+                    alertDialog.show()
+                } else {
+                    connect(ips[0], port, secret, key, name)
                 }
-                val alertDialog = alertDialogBuilder.create()
-                alertDialog.show()
-            } else {
-                connect(ips[0], port, secret, key, name)
             }
+
+            val ips = args[0].split(",")
+                    .filter { ip -> ipAddresses.any { subnet -> Util.sameNetwork(ip, subnet) } }
+
+            if (ips.isEmpty()) {
+                val builder = android.app.AlertDialog.Builder(this)
+                builder.setMessage(
+                        "This server does not seem to be in the common network with this device.\nYour ip's:${
+                            ipAddresses.joinToString(
+                                    ","
+                            )
+                        }\nTarget ip's: ${args[0]}"
+                )
+                        .setPositiveButton(
+                                "Try to connect anyway."
+                        ) { _, _ ->
+                            doConnect(args[0].split(","))
+                        }
+
+                val dialog = builder.create()
+                dialog.show()
+                return
+            }
+
+            doConnect(ips)
         }
     }
 
@@ -506,9 +617,9 @@ class MainActivity : AppCompatActivity() {
                 binding.fabKeysGenerating.visibility = View.GONE
 
                 Toast.makeText(
-                    this,
-                    "Keys generated",
-                    Toast.LENGTH_LONG
+                        this,
+                        "Keys generated",
+                        Toast.LENGTH_LONG
                 ).show()
 
             } catch (e: RuntimeException) {
@@ -525,11 +636,11 @@ class MainActivity : AppCompatActivity() {
 
         val i = Intent(filterKeysChange)
         i.putExtra("keysReady", keysReady)
-        LocalBroadcastManager.getInstance(this).sendBroadcast(i)
+        broadcastManager.sendBroadcast(i)
     }
 
     private inner class ScreenSlidePagerAdapter(fa: FragmentActivity) :
-        FragmentStateAdapter(fa) {
+            FragmentStateAdapter(fa) {
         override fun getItemCount(): Int = 3
 
         override fun createFragment(position: Int): Fragment {

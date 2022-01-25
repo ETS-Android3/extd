@@ -51,12 +51,12 @@ class ConnectionUtils() : Closeable {
     }
 
     private fun prepareConnection(
-        host: String,
-        port: Int,
-        daemonPort: Int,
-        pass: String,
-        name: String,
-        secret: String
+            host: String,
+            port: Int,
+            daemonPort: Int,
+            pass: String,
+            name: String,
+            secret: String
     ): Connection {
         val trimmedPass = pass.trim()
 
@@ -68,20 +68,14 @@ class ConnectionUtils() : Closeable {
             throw RuntimeException("prepare connection: invalid port: $port")
         }
 
-        //        conn.userName = "extd"
-//        conn.useLocalCursor = true // always enable
-//        conn.colorModel = COLORMODEL.C24bit.nameString()
-//        conn.useRepeater = false
-
         return Connection(
-            name,
-            "127.0.0.1",
-            host,
-            port,
-            daemonPort,
-            secret,
-            pass,
-            Date()
+                name,
+                host,
+                port,
+                daemonPort,
+                secret,
+                pass,
+                Date()
         )
     }
 
@@ -126,7 +120,7 @@ class ConnectionUtils() : Closeable {
                 flush()
             }
 
-            while (result != null && !result!!.contains("extd:ok", true)) {
+            while (!result.contains("extd:ok", true)) {
                 Log.d("extd", "part: $result")
                 result = readLine().lowercase()
             }
@@ -144,7 +138,7 @@ class ConnectionUtils() : Closeable {
 
         val message = "$secret:${
             Base64.getEncoder()
-                .encodeToString(formatPublicKeyForAuthorizedKeysEntry().toByteArray())
+                    .encodeToString(formatPublicKeyForAuthorizedKeysEntry().toByteArray())
         }"
         val secretBytes = Token.generate(key, message).serialise().toByteArray()
 
@@ -240,12 +234,12 @@ class ConnectionUtils() : Closeable {
     }
 
     fun connect(
-        ip: String,
-        port: Int,
-        secret: String,
-        pass: String,
-        key: String,
-        name: String
+            ip: String,
+            port: Int,
+            secret: String,
+            pass: String,
+            key: String,
+            name: String
     ): Connection {
         val daemonPort = preConnect(ip, port, secret, key)
         prepareSession(ip)
@@ -265,7 +259,7 @@ class ConnectionUtils() : Closeable {
     }
 
     fun connect(connection: Connection): Connection {
-        prepareSession(connection.originalIp) // tunnel to original ip
+        prepareSession(connection.ip) // tunnel to original ip
 
         val response = requestServer(connection.password, connection.daemonPort)
         val adbOn = response[0] == 1
@@ -279,12 +273,12 @@ class ConnectionUtils() : Closeable {
 
         Log.d("extd", "listening on $port")
         return prepareConnection(
-            connection.ip,
-            port,
-            connection.daemonPort,
-            connection.password,
-            connection.name,
-            connection.secret
+                connection.ip,
+                port,
+                connection.daemonPort,
+                connection.password,
+                connection.name,
+                connection.secret
         )
     }
 

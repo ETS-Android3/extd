@@ -5,7 +5,6 @@ import com.jcraft.jsch.JSchException
 import com.jcraft.jsch.KeyPair
 import java.io.IOException
 import java.io.OutputStream
-import java.lang.RuntimeException
 
 class KeyUtils {
     companion object {

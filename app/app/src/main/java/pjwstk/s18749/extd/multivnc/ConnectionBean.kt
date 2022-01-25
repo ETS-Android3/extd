@@ -6,99 +6,74 @@ import kotlinx.serialization.Serializable
 
 @Parcelize
 @Serializable
-//@Entity(tableName = "CONNECTION_BEAN")
 data class ConnectionBean(
     @JvmField
-//    @PrimaryKey(autoGenerate = true)
-//    @ColumnInfo(name = "_id")
     var id: Long = 0,
 
     @JvmField
-//    @ColumnInfo(name = "NICKNAME")
     var nickname: String? = "",
 
     @JvmField
-//    @ColumnInfo(name = "NAME")
     var name: String = "",
 
     @JvmField
-//    @ColumnInfo(name = "ADDRESS")
     var address: String = "",
 
     @JvmField
-//    @ColumnInfo(name = "SECRET")
     var secret: String = "",
 
     @JvmField
-//    @ColumnInfo(name = "PORT")
     var port: Int = 5900,
 
     @JvmField
-//    @ColumnInfo(name = "PASSWORD")
     var password: String = "",
 
     @JvmField
-//    @ColumnInfo(name = "COLORMODEL")
     var colorModel: String? = COLORMODEL.C24bit.nameString(),
 
     @JvmField
-//    @ColumnInfo(name = "FORCEFULL")
     var forceFull: Long = 0,
 
     @JvmField
-//    @ColumnInfo(name = "REPEATERID")
     var repeaterId: String? = "",
 
     @JvmField
-//    @ColumnInfo(name = "INPUTMODE")
     var inputMode: String? = null,
 
     @JvmField
-//    @ColumnInfo(name = "SCALEMODE")
     var scalemode: String? = null,
 
     @JvmField
-//    @ColumnInfo(name = "USELOCALCURSOR")
     var useLocalCursor: Boolean = false,
 
     @JvmField
-//    @ColumnInfo(name = "KEEPPASSWORD")
     var keepPassword: Boolean = true,
 
     @JvmField
-//    @ColumnInfo(name = "FOLLOWMOUSE")
     var followMouse: Boolean = true,
 
     @JvmField
-//    @ColumnInfo(name = "USEREPEATER")
     var useRepeater: Boolean = false,
 
     @JvmField
-//    @ColumnInfo(name = "METALISTID")
     var metaListId: Long = 1,
 
     @JvmField
-//    @ColumnInfo(name = "LAST_META_KEY_ID")
     var lastMetaKeyId: Long = 0,
 
     @JvmField
-//    @ColumnInfo(name = "FOLLOWPAN", defaultValue = "0")
     var followPan: Boolean = false,
 
     @JvmField
-//    @ColumnInfo(name = "USERNAME")
     var userName: String? = "",
 
     @JvmField
-//    @ColumnInfo(name = "SECURECONNECTIONTYPE")
     var secureConnectionType: String? = null,
 
     @JvmField
-//    @ColumnInfo(name = "SHOWZOOMBUTTONS", defaultValue = "1")
     var showZoomButtons: Boolean = false,
 
     @JvmField
-//    @ColumnInfo(name = "DOUBLE_TAP_ACTION")
     var doubleTapAction: String? = null
 
 ) : Comparable<ConnectionBean>, Parcelable {
@@ -149,9 +124,6 @@ data class ConnectionBean(
     }
 
     companion object {
-        //These are used by ConnectionListActivity
-        const val GEN_FIELD_NICKNAME = "NICKNAME"
-        const val GEN_FIELD_ADDRESS = "ADDRESS"
         const val GEN_FIELD_PORT = "PORT"
         const val GEN_FIELD_REPEATERID = "REPEATERID"
     }

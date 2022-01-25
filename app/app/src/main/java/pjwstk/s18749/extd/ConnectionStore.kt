@@ -3,7 +3,7 @@ package pjwstk.s18749.extd
 import java.io.*
 
 class ConnectionStore(
-    private val store: File
+        private val store: File
 ) {
     fun save(connections: List<Connection>?) {
         if (connections != null) {
@@ -22,9 +22,9 @@ class ConnectionStore(
                     }
                 }
             } catch (e: InvalidClassException) {
-                throw RuntimeException("could not load saved connections")
-            }  catch (e: ClassNotFoundException) {
-                throw RuntimeException("could not load saved connections")
+//                throw RuntimeException("could not load saved connections")
+            } catch (e: ClassNotFoundException) {
+//                throw RuntimeException("could not load saved connections")
             }
         }
 

@@ -31,6 +31,7 @@ package pjwstk.s18749.extd.multivnc;
 //
 
 import pjwstk.s18749.extd.R;
+
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -402,28 +403,6 @@ public class VncCanvas extends GLSurfaceView {
         }
     }
 
-
-    /*
-     * f(x,s) is a function that returns the coordinate in screen/scroll space corresponding
-     * to the coordinate x in full-frame space with scaling s.
-     *
-     * This function returns the difference between f(x,s1) and f(x,s2)
-     *
-     * f(x,s) = (x - i/2) * s + ((i - w)/2)) * s
-     *        = s (x - i/2 + i/2 + w/2)
-     *        = s (x + w/2)
-     *
-     *
-     * f(x,s) = (x - ((i - w)/2)) * s
-     * @param oldscaling
-     * @param scaling
-     * @param imageDim
-     * @param windowDim
-     * @param offset
-     * @return
-     */
-
-
     /**
      * Change to Canvas's scroll position to match the absoluteXPosition
      */
@@ -567,12 +546,7 @@ public class VncCanvas extends GLSurfaceView {
             if (showDesktopInfo.get()) {
                 showDesktopInfo.set(false);
 
-                handler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        showConnectionInfo();
-                    }
-                });
+                handler.post(() -> showConnectionInfo());
             }
 
         }
@@ -773,19 +747,24 @@ public class VncCanvas extends GLSurfaceView {
         return scaling.getScale();
     }
 
-    /**
-     * @return The smallest scale supported by the implementation; the scale at which
-     * the bitmap would be smaller than the screen
-     */
-    float getMinimumScale() {
-        double scale = 0.75;
+    float getFitScale() {
+        double scale = 1;
         int displayWidth = getWidth();
         int displayHeight = getHeight();
-        for (; scale >= 0; scale -= 0.25) {
-            if (scale * vncConn.getFramebufferWidth() < displayWidth && scale * vncConn.getFramebufferHeight() < displayHeight)
-                break;
-        }
-        return (float) (scale + 0.25);
+
+        while (scale * vncConn.getFramebufferWidth() > displayWidth || scale * vncConn.getFramebufferHeight() > displayHeight) scale -= 0.1;
+
+        return (float) scale + .1f;
+    }
+
+    float getFitScale(boolean invert) {
+        double scale = 1;
+        int displayWidth = invert ? getHeight() : getWidth();
+        int displayHeight = invert ? getWidth() : getHeight();
+
+        while (scale * vncConn.getFramebufferWidth() > displayWidth || scale * vncConn.getFramebufferHeight() > displayHeight) scale -= 0.1;
+
+        return (float) scale + .1f;
     }
 
     public int getVisibleWidth() {
@@ -798,35 +777,32 @@ public class VncCanvas extends GLSurfaceView {
 
     public void getCredsFromUser(final ConnectionBean c, boolean isUserNameNeeded) {
         // this method is probably called from the vnc thread
-        post(new Runnable() {
-            @Override
-            public void run() {
+        post(() -> {
 
-                LayoutInflater layoutinflater = LayoutInflater.from(activity);
-                View credentialsDialog = layoutinflater.inflate(R.layout.credentials_dialog, null);
-                if (!isUserNameNeeded)
-                    credentialsDialog.findViewById(R.id.username_row).setVisibility(GONE);
+            LayoutInflater layoutinflater = LayoutInflater.from(activity);
+            View credentialsDialog = layoutinflater.inflate(R.layout.credentials_dialog, null);
+            if (!isUserNameNeeded)
+                credentialsDialog.findViewById(R.id.username_row).setVisibility(GONE);
 
-                AlertDialog dialog = new AlertDialog.Builder(getContext())
-                        .setTitle(getContext().getString(R.string.credentials_needed_title))
-                        .setView(credentialsDialog)
-                        .setCancelable(false)
-                        .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int whichButton) {
-                                if (isUserNameNeeded) {
-                                    c.userName = ((EditText) credentialsDialog.findViewById(R.id.userName)).getText().toString();
-                                }
-
-                                c.password = ((EditText) credentialsDialog.findViewById(R.id.password)).getText().toString();
-                                synchronized (vncConn) {
-                                    vncConn.notify();
-                                }
+            AlertDialog dialog = new AlertDialog.Builder(getContext())
+                    .setTitle(getContext().getString(R.string.credentials_needed_title))
+                    .setView(credentialsDialog)
+                    .setCancelable(false)
+                    .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int whichButton) {
+                            if (isUserNameNeeded) {
+                                c.userName = ((EditText) credentialsDialog.findViewById(R.id.userName)).getText().toString();
                             }
-                        }).create();
 
-                dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
-                dialog.show();
-            }
+                            c.password = ((EditText) credentialsDialog.findViewById(R.id.password)).getText().toString();
+                            synchronized (vncConn) {
+                                vncConn.notify();
+                            }
+                        }
+                    }).create();
+
+            dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+            dialog.show();
         });
 
     }
