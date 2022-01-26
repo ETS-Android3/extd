@@ -19,9 +19,6 @@ def load_key():
 
 private_key = load_key()
 
-# pid = os.fork()
-
-# if pid == 0:
 try:
     handled = False
 

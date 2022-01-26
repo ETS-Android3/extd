@@ -1,14 +1,12 @@
 #!/bin/bash
 
-output="$1"
-mode="$2"
-direction="$3"
-reference="$4"
+set -e
 
-help() {
-  printf "usage:\nsetup output|auto [w]x[h]_[r]+[x]+[y] [direction][-of] [output|primary]\n"
-  printf "\tdirection: one of [right-of, left-of, above, below]\n"
-}
+mode="$1"
+direction="$2"
+
+[ -z "$mode" ] && echo "extd:error:no_mode_provided" && exit 1
+[ -z "$direction" ] && echo "extd:error:no_direction_provided" && exit 1
 
 get_available_output() {
   virtual="$(xrandr -q | grep disconnected | grep VIRTUAL | head -n1 | cut -f1 -d ' ')"
@@ -18,40 +16,16 @@ get_available_output() {
   echo "$unused"
 }
 
-# check_output
-[ -z "$output" ] && echo "no output selected" && help && exit 1
+output="$(get_available_output)"
+[ -z "$output" ] && echo "extd:error:no_outputs" && exit 1
 
-if [ "$output" == "auto" ]; then
-  output="$(get_available_output)"
+reference="$(xrandr -q | grep primary | cut -d' ' -f1)"
+[ -z "$reference" ] && echo "extd:error:no_primary_display" && exit 1
 
-  [ -z "$ouput" ] && echo "no outputs available" && exit 1
-fi
-# turn off if was running
-xrandr 2>/dev/null --output "$output" --off
-
-if xrandr -q | grep -q "$output connected"; then
-  xrandr --output "$output" --off
-fi
-
-# check_reference
-[ -z "$reference" ] && echo "no reference output selected" && help && exit 1
-
-if [ "$reference" == "primary" ]; then
-  reference="$(xrandr -q | grep primary | cut -d' ' -f1)"
-
-  [ -z "$reference" ] && echo "no primary reference output available" && exit 1
-fi
-
-xrandr -q | grep -q "$reference disconnected" && echo "reference output is not active" && help && exit 1
-
-# check_direction
-[ -z "$direction" ] && echo "no direction provided" && help && exit 1
+xrandr -q | grep -q "$reference disconnected" && echo "extd:error:reference_display_disconnected" && exit 1
 
 direction="$(printf "left-of\nright-of\nabove\nbelow" | grep -F "$direction")"
-[ -z "$direction" ] && echo "invalid direction ($direction) provided" && help && exit 1
-
-# check_mode
-[ -z "$mode" ] && echo "no mode provided" && help && exit 1
+[ -z "$direction" ] && echo "extd:error:invalid_direction" && exit 1
 
 res="$(echo "$mode" | cut -d'_' -f1)"
 
@@ -67,38 +41,22 @@ hp="$(echo "$primary_dim" | cut -d'x' -f2)"
 # [ "$direction" == "below" ] && clip="${wp}x${hp}+0+${hp}"
 # [ "$direction" == "right-of" ] && clip="${wp}x${hp}+${wp}+0"
 
-[ -z "$w" ] && echo "invalid mode: no width provided" && help && exit 1
-[ -z "$h" ] && echo "invalid mode: no height provided" && help && exit 1
-[ -z "$r" ] && echo "invalid mode: no refresh rate provided" && help && exit 1
-
-printf "settings:\n\toutput: $output\n\tmode: $mode\n\tdirection: $direction\n\tclip: ${clip}\n\treference: $reference\n"
+[ -z "$w" ] && echo "extd:error:invalid_mode_no_width" && exit 1
+[ -z "$h" ] && echo "extd:error:invalid_mode_no_height" && exit 1
+[ -z "$r" ] && echo "extd:error:invalid_mode_no_refresh" && exit 1
 
 modeline="$(cvt "$w" "$h" "$r" | sed -n 's/.*Modeline "\([^" ]\+\)" \(.*\)/\1 \2/p')"
 name="$(echo "${modeline}" | sed 's/\([^ ]\+\) .*/\1/')"
-[[ -z "${modeline}" || -z "$name" ]] && echo "Error! modeline='${modeline}' name='$name'" && exit 1
+[[ -z "${modeline}" || -z "$name" ]] && echo "extd:error:modeline_error" && exit 1
 
-xrandr 2>/dev/null --delmode "$output" "$name"
-xrandr 2>/dev/null --rmmode "$name"
+xrandr >/dev/null 2>&1 --delmode "$output" "$name"
+xrandr >/dev/null 2>&1 --rmmode "$name"
 
 set -e
-xrandr --newmode ${modeline}
-xrandr --addmode "$output" "$name"
+xrandr >/dev/null 2>&1 --newmode ${modeline}
+xrandr >/dev/null 2>&1 --addmode "$output" "$name"
 
 # Enable the display
-xrandr --output "$output" --mode "$name" --"$direction" "$reference"
+xrandr >/dev/null 2>&1 --output "$output" --mode "$name" --"$direction" "$reference"
 
-# [ ! -f "$HOME/.vnc/passwd" ] && x11vnc -storepasswd "$HOME/.vnc/passwd"
-
-# clip="$(xrandr | grep "^$DEVICE.*$" | grep -o '[0-9]*x[0-9]*+[0-9]*+[0-9]*')"
-# x11vnc -usepw -clip xinerama1 -multiptr -xkb # -ssl SAVE
-sleep 3
-# arandr &
-x11vnc -nounixpw -usepw -xvnc -avahi -clip xinerama1 -shared -ungrabboth
-# -ssl SAVE-jannec
-# ssh -t -L 5900:localhost:5900 192.168.240.88 'x11vnc -clip "$clip" -noxinerama -noxrandr -nevershared -usepw -multiptr -xkb'
-
-# vncviewer -PreferredEncoding=ZRLE localhost:0
-
-xrandr 2>/dev/null --output "$output" --off
-xrandr 2>/dev/null --delmode "$output" "$name"
-xrandr 2>/dev/null --rmmode "$name"
+echo "extd:ok"
