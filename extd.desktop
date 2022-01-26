@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Extd Manager
+Description=Extended Desktop System Manager
+Exec=/usr/bin/python3 __BIN_DIR__/extd_manager add
+Type=Application
+Categories=GTK;GNOME;Utility;

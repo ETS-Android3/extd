@@ -3,14 +3,12 @@
 from re import sub
 import sys
 import random
-from cryptography.fernet import Fernet
 import netifaces
 import ipaddress
 import subprocess
 import socket
 from string import ascii_letters
 import os
-import datetime
 import base64
 import key_utils
 
@@ -111,7 +109,6 @@ if sys.argv[1] == "add":
     secret = get_random_string(12)
     # secret = "secret"
     ips = get_ips()
-    now = datetime.datetime.now()
 
     temp_key = key_utils.newkey().decode("utf-8")
     name = f'{socket.gethostname()}'

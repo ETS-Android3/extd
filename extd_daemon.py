@@ -14,6 +14,8 @@ import key_utils
 
 logging.basicConfig(filename="extd.log", level=logging.INFO)
 
+daemonPort = __DAEMON_PORT__
+
 
 def get_ports():
     port_range = open("/proc/sys/net/ipv4/ip_local_port_range", "r")
@@ -142,7 +144,8 @@ def listen(port: int, secret: str, user: str, temp_key: str):
                     entry = base64.b64encode(entry)
 
                     out = subprocess.check_output(
-                        ["/usr/bin/ssh", "-i", "__PRIVATE_SSH_KEY__", "extd@localhost"],
+                        ["/usr/bin/ssh", "-o", "StrictHostKeyChecking no",
+                            "-i", "__PRIVATE_SSH_KEY__", "extd@localhost"],
                         input=f'daemon:{entry.decode("utf-8")}'.encode("utf-8")
                     )
 
@@ -156,7 +159,7 @@ def listen(port: int, secret: str, user: str, temp_key: str):
                     if out == "extd:accepted":
                         logging.info("extd:daemon:listen:accepted")
                         # send result to the requesting device
-                        connection.sendall(f'extd:ok:{__DAEMON_PORT__}'.encode(
+                        connection.sendall(f'extd:ok:{daemonPort}'.encode(
                             "utf-8"))
 
                     else:
@@ -193,12 +196,12 @@ def listen(port: int, secret: str, user: str, temp_key: str):
 
 
 private_key = key_utils.load_key()
-address = ("localhost", __DAEMON_PORT__)
+address = ("localhost", daemonPort)
 pid_table = {}
 
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
     s.bind(address)
-    logging.info(f'extd:daemon extd listening on port {__DAEMON_PORT__}')
+    logging.info(f'extd:daemon extd listening on port {daemonPort}')
 
     while True:
         try:

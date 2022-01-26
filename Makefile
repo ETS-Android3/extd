@@ -35,6 +35,9 @@ install:
 	sed 's#__PRIVATE_KEY__#$(USER_KEY_FOLDER)/extd.key#g;s#__USER_HOME_DIR__#$(EXTD_USER_HOME)#g;s#__DAEMON_PORT__#$(DAEMON_PORT)#g' extd_manager.py > $(BIN_DIR)/extd_manager
 
 	sed 's#__PRIVATE_SSH_KEY__#$(USER_KEY_FOLDER)/extd#g;s#__PRIVATE_KEY__#$(USER_KEY_FOLDER)/extd.key#g;s#__USER_HOME_DIR__#$(EXTD_USER_HOME)#g;s#__DAEMON_PORT__#$(DAEMON_PORT)#g' extd_daemon.py > $(BIN_DIR)/extd_daemon
+	
+	mkdir -p $(APP_DIR)
+	sed 's#__DAEMON_PORT__#$(DAEMON_PORT)#g' extd.desktop > $(APP_DIR)/extd.desktop
 
 	sed 's#__PRIVATE_KEY__#$(EXTD_USER_HOME)/.ssh/extd.key#g;s#__USER_HOME_DIR__#$(EXTD_USER_HOME)#g;s#__DAEMON_PORT__#$(DAEMON_PORT)#g' ssh_handler.py > $(EXTD_USER_HOME)/bin/ssh_handler
 
